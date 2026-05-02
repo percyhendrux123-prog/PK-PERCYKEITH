@@ -17,7 +17,7 @@ const TK = {
   gold: '#C9A961',
 };
 
-const CHECKIN_URL = 'https://pkfit-checkin.netlify.app/';
+// Self-contained: no cross-app links. One AI per app.
 
 const STYLES = `
   .pk-cd { font-family: 'Geist', -apple-system, sans-serif; background: #000; color: #FAFAFA; min-height: 100vh; }
@@ -412,24 +412,7 @@ const TimelineRow = ({ item, last }) => {
 // ─────────────────────────────────────────────────────────
 const CheckIns = ({ checkIns }) => (
   <section style={{ padding: '24px 28px', maxWidth: 1080, margin: '0 auto', width: '100%' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-      <div className="pk-cd-label">CHECK-IN HISTORY</div>
-      <button
-        onClick={() => window.open(CHECKIN_URL, '_blank')}
-        className="pk-cd-mono"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 12px', borderRadius: 8,
-          background: 'rgba(250,250,250,0.04)', color: TK.textDim,
-          border: `1px solid ${TK.hairline}`, cursor: 'pointer',
-          fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-        }}
-      >
-        REQUEST CHECK-IN
-        <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
-      </button>
-    </div>
+    <div className="pk-cd-label" style={{ marginBottom: 16 }}>CHECK-IN HISTORY</div>
     {checkIns.length === 0 ? (
       <div className="pk-cd-glass" style={{
         padding: '48px 24px', textAlign: 'center', color: TK.textMute,

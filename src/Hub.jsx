@@ -131,8 +131,7 @@ const STYLES = `
   }
 `;
 
-const INTAKE_URL = 'https://pkfit-intake.netlify.app/';
-const CHECKIN_URL = 'https://pkfit-checkin.netlify.app/';
+// Self-contained: no cross-app links. One AI per app.
 
 // ─────────────────────────────────────────────────────────
 // Formatters
@@ -311,10 +310,116 @@ const useHub = (coachId) => {
 };
 
 const COMMANDS = [
-  { id: 'invite-client', label: 'Invite a new client...',         icon: Plus,             hint: 'Action' },
-  { id: 'request-checkin', label: 'Request a check-in...',        icon: ClipboardCheck,   hint: 'Action' },
-  { id: 'gen-workout',  label: 'Ask AI to generate a workout',    icon: Sparkles,         hint: 'AI' },
+  { id: 'add-client',  label: 'Add a new client...',             icon: Plus,     hint: 'Action' },
+  { id: 'gen-workout', label: 'Ask AI to generate a workout',    icon: Sparkles, hint: 'AI' },
 ];
+
+// ─────────────────────────────────────────────────────────
+// ADD CLIENT MODAL — internal back-door form
+// ─────────────────────────────────────────────────────────
+const AddClientModal = ({ open, onClose, onSubmit }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [plan, setPlan] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (open) { setName(''); setEmail(''); setPlan(''); setErr(''); }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (!name.trim()) { setErr('Name is required.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await onSubmit({
+        name: name.trim(),
+        email: email.trim() || null,
+        plan: plan.trim() || null,
+      });
+      onClose();
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally { setBusy(false); }
+  };
+
+  if (!open) return null;
+  return (
+    <div className="pk-pal-overlay" onClick={onClose}>
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="pk-glass pk-glass-elev"
+        style={{
+          width: 'min(520px, 92vw)', padding: 0,
+          animation: 'pk-rise 220ms cubic-bezier(0.2,0.7,0.2,1) both',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 22px', borderBottom: `1px solid ${TK.hairline}`,
+        }}>
+          <div className="pk-mono" style={{
+            fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+            color: TK.gold, fontWeight: 600,
+          }}>
+            ADD CLIENT
+          </div>
+          <button type="button" onClick={onClose} style={{
+            background: 'transparent', border: 'none', color: TK.textMute,
+            cursor: 'pointer', padding: 4, borderRadius: 6,
+            display: 'flex', alignItems: 'center',
+          }}>
+            <X size={14} strokeWidth={2} />
+          </button>
+        </div>
+        <div style={{ padding: 22 }}>
+          <Field label="NAME">
+            <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Eli Schwartz" />
+          </Field>
+          <Field label="EMAIL · OPTIONAL">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="eli@example.com" />
+          </Field>
+          <Field label="PLAN · OPTIONAL">
+            <Input value={plan} onChange={(e) => setPlan(e.target.value)} placeholder="30-day · monthly" />
+          </Field>
+          {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
+            <button type="submit" className="pk-cta pk-cta-gold" disabled={busy}>
+              {busy ? <><Loader2 size={12} style={{ animation: 'pk-spin 1s linear infinite' }} /> SAVING</> : 'SAVE CLIENT'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const Field = ({ label, children }) => (
+  <label style={{ display: 'block', marginBottom: 14 }}>
+    <div className="pk-label" style={{ marginBottom: 6 }}>{label}</div>
+    {children}
+  </label>
+);
+const Input = (props) => (
+  <input {...props} style={{
+    width: '100%', padding: '10px 12px', borderRadius: 10,
+    background: 'rgba(0,0,0,0.4)', color: TK.text,
+    border: `1px solid ${TK.hairline}`, outline: 'none',
+    fontSize: 14, fontFamily: 'inherit',
+    ...(props.style || {}),
+  }} />
+);
 
 // ─────────────────────────────────────────────────────────
 // HEADER
@@ -587,8 +692,7 @@ const ClientsPanel = ({ q, setQ, clients, onOpenClient, onInvite }) => {
             />
           </div>
           <button onClick={onInvite} className="pk-cta pk-cta-gold" style={{ padding: '7px 14px' }}>
-            <Plus size={13} strokeWidth={2.4} /> INVITE CLIENT
-            <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
+            <Plus size={13} strokeWidth={2.4} /> ADD CLIENT
           </button>
         </div>
       </div>
@@ -622,8 +726,7 @@ const ClientsPanel = ({ q, setQ, clients, onOpenClient, onInvite }) => {
               Send a client through the intake flow to get started.
             </div>
             <button onClick={onInvite} className="pk-cta pk-cta-gold" style={{ padding: '10px 18px' }}>
-              <Plus size={13} strokeWidth={2.4} /> INVITE FIRST CLIENT
-              <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
+              <Plus size={13} strokeWidth={2.4} /> ADD FIRST CLIENT
             </button>
           </div>
         ) : filtered.length === 0 ? (
@@ -1016,6 +1119,7 @@ const ErrorState = ({ message }) => (
 
 export default function Hub() {
   const [palette, setPalette] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [q, setQ] = useState('');
   const [aiSeed, setAiSeed] = useState('');
   const auth = useAuth();
@@ -1061,12 +1165,21 @@ export default function Hub() {
   if (!auth.session) return <SignIn />;
 
   const openClient = (id) => navigate(`/c/${id}`);
-  const openIntake = () => window.open(INTAKE_URL, '_blank');
+  const openAddClient = () => setAddOpen(true);
+
+  const addClient = async ({ name, email, plan }) => {
+    const { error } = await supabase.from('profiles').insert({
+      role: 'client',
+      name,
+      email,
+      plan,
+    });
+    if (error) throw error;
+  };
 
   const handleCommand = (item) => {
     if (item.kind === 'cmd') {
-      if (item.id === 'invite-client') openIntake();
-      else if (item.id === 'request-checkin') window.open(CHECKIN_URL, '_blank');
+      if (item.id === 'add-client') openAddClient();
       else if (item.id === 'gen-workout') {
         setAiSeed('Generate a 4-week pull block');
         setTimeout(() => document.getElementById('ai-panel')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -1100,7 +1213,7 @@ export default function Hub() {
             q={q} setQ={setQ}
             clients={data.clients}
             onOpenClient={openClient}
-            onInvite={openIntake}
+            onInvite={openAddClient}
           />
           <AIPanel initialPrompt={aiSeed} />
         </>
@@ -1113,6 +1226,11 @@ export default function Hub() {
         onClose={() => setPalette(false)}
         clients={data.clients}
         onAction={handleCommand}
+      />
+      <AddClientModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={addClient}
       />
     </div>
   );
