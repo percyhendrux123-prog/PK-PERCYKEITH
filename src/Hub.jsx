@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, Command, ArrowUpRight, ArrowRight, Plus, Sparkles,
   Users, Library, Settings, Activity, ChevronRight, Filter,
   MoreHorizontal, Clock, Send, X, CornerDownLeft, Zap, Loader2,
-  Check, Trophy, Calendar,
+  Check, Trophy, Calendar, LogOut,
 } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
+import { useAuth, signOut, SignIn } from './lib/auth.jsx';
 
 // ─────────────────────────────────────────────────────────
 // PKFIT · IDENTITY ARCHITECT · PERCY KEITH
@@ -408,62 +410,112 @@ const TextArea = (props) => (
 // ─────────────────────────────────────────────────────────
 // HEADER
 // ─────────────────────────────────────────────────────────
-const Header = ({ onCmd }) => (
-  <header style={{
-    position: 'sticky', top: 0, zIndex: 50,
-    padding: '14px 28px',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(20px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-    borderBottom: `1px solid ${TK.hairline}`,
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-      <div style={{
-        width: 26, height: 26, borderRadius: 7,
-        background: TK.gold, color: '#000',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 800, fontSize: 13, letterSpacing: '-0.04em',
-      }}>P</div>
-      <div className="pk-mono" style={{
-        fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
-        color: TK.text, fontWeight: 600,
-      }}>
-        PKFIT <span style={{ color: TK.textMute, margin: '0 8px' }}>·</span>
-        <span style={{ color: TK.textDim }}>IDENTITY ARCHITECT</span>
-        <span style={{ color: TK.textMute, margin: '0 8px' }}>·</span>
-        <span style={{ color: TK.textMute }}>PERCY KEITH</span>
+const Header = ({ onCmd, displayName }) => {
+  const initials = (displayName || 'PK').split(' ').map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PK';
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <header style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      padding: '14px 28px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      background: 'rgba(0,0,0,0.6)',
+      backdropFilter: 'blur(20px) saturate(160%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+      borderBottom: `1px solid ${TK.hairline}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 26, height: 26, borderRadius: 7,
+          background: TK.gold, color: '#000',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: 13, letterSpacing: '-0.04em',
+        }}>P</div>
+        <div className="pk-mono" style={{
+          fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+          color: TK.text, fontWeight: 600,
+        }}>
+          PKFIT <span style={{ color: TK.textMute, margin: '0 8px' }}>·</span>
+          <span style={{ color: TK.textDim }}>IDENTITY ARCHITECT</span>
+          <span style={{ color: TK.textMute, margin: '0 8px' }}>·</span>
+          <span style={{ color: TK.textMute }}>PERCY KEITH</span>
+        </div>
       </div>
-    </div>
 
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <button
-        onClick={onCmd}
-        className="pk-glass pk-row-hover"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '8px 12px 8px 14px', borderRadius: 10,
-          color: TK.textDim, fontSize: 13, cursor: 'pointer',
-          border: `1px solid ${TK.hairline}`, background: 'rgba(250,250,250,0.025)',
-        }}
-      >
-        <Search size={13} strokeWidth={2} />
-        <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>Search</span>
-        <span className="pk-kbd">⌘K</span>
-      </button>
-      <div style={{
-        width: 30, height: 30, borderRadius: 8,
-        background: 'rgba(250,250,250,0.06)',
-        border: `1px solid ${TK.hairline}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: 'Geist Mono, monospace', fontSize: 11, fontWeight: 600,
-        letterSpacing: '0.05em',
-      }}>
-        {COACH.initials}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+        <button
+          onClick={onCmd}
+          className="pk-glass pk-row-hover"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '8px 12px 8px 14px', borderRadius: 10,
+            color: TK.textDim, fontSize: 13, cursor: 'pointer',
+            border: `1px solid ${TK.hairline}`, background: 'rgba(250,250,250,0.025)',
+          }}
+        >
+          <Search size={13} strokeWidth={2} />
+          <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12 }}>Search</span>
+          <span className="pk-kbd">⌘K</span>
+        </button>
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          style={{
+            width: 30, height: 30, borderRadius: 8,
+            background: 'rgba(250,250,250,0.06)',
+            border: `1px solid ${TK.hairline}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'Geist Mono, monospace', fontSize: 11, fontWeight: 600,
+            letterSpacing: '0.05em', color: TK.text, cursor: 'pointer',
+          }}
+        >
+          {initials}
+        </button>
+        {menuOpen && (
+          <>
+            <div onClick={() => setMenuOpen(false)} style={{
+              position: 'fixed', inset: 0, zIndex: 40,
+            }} />
+            <div className="pk-glass pk-glass-elev" style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+              minWidth: 200, padding: 8, zIndex: 60,
+              animation: 'pk-rise 180ms ease both',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            }}>
+              <div style={{
+                padding: '10px 12px', borderBottom: `1px solid ${TK.hairline}`,
+                marginBottom: 4,
+              }}>
+                <div style={{ fontSize: 13, color: TK.text, fontWeight: 600 }}>
+                  {displayName || 'Coach'}
+                </div>
+                <div className="pk-mono" style={{
+                  fontSize: 10, color: TK.textMute, marginTop: 2,
+                  letterSpacing: '0.10em', textTransform: 'uppercase',
+                }}>
+                  SIGNED IN
+                </div>
+              </div>
+              <button
+                onClick={() => { setMenuOpen(false); signOut(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '10px 12px', borderRadius: 8,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: TK.textDim, fontSize: 13, fontFamily: 'inherit',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(250,250,250,0.05)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <LogOut size={13} strokeWidth={2} />
+                Sign out
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 // ─────────────────────────────────────────────────────────
 // HERO — "WHAT'S NEXT?"
@@ -621,7 +673,7 @@ const SessionCard = ({ s, onComplete }) => {
 // ─────────────────────────────────────────────────────────
 // CLIENTS TABLE
 // ─────────────────────────────────────────────────────────
-const ClientsPanel = ({ q, setQ, clients, onAddClient }) => {
+const ClientsPanel = ({ q, setQ, clients, onAddClient, onOpenClient }) => {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return clients;
@@ -680,7 +732,7 @@ const ClientsPanel = ({ q, setQ, clients, onAddClient }) => {
           <span></span>
         </div>
         {filtered.map((c, i) => (
-          <ClientRow key={c.id} c={c} last={i === filtered.length - 1} />
+          <ClientRow key={c.id} c={c} last={i === filtered.length - 1} onOpen={onOpenClient} />
         ))}
         {filtered.length === 0 && (
           <div style={{ padding: '32px 20px', textAlign: 'center', color: TK.textMute, fontSize: 13 }}>
@@ -692,12 +744,13 @@ const ClientsPanel = ({ q, setQ, clients, onAddClient }) => {
   );
 };
 
-const ClientRow = ({ c, last }) => {
+const ClientRow = ({ c, last, onOpen }) => {
   const [hover, setHover] = useState(false);
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onClick={() => onOpen?.(c.id)}
       className="pk-row-hover"
       style={{
         display: 'grid',
@@ -1304,6 +1357,8 @@ export default function Hub() {
   const [q, setQ] = useState('');
   const [modal, setModal] = useState(null); // 'add-client' | 'log-pr' | 'assign-tmpl' | { kind: 'assign-tmpl', templateId }
   const [aiSeed, setAiSeed] = useState('');
+  const auth = useAuth();
+  const navigate = useNavigate();
   const data = useHub();
 
   // Cursor spotlight
@@ -1337,9 +1392,29 @@ export default function Hub() {
         setAiSeed('Generate a 4-week pull block for J. Kim');
         setTimeout(() => document.getElementById('ai-panel')?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
+    } else if (item.kind === 'client') {
+      navigate(`/c/${item.id}`);
     }
-    // For 'client' kind, future: route to /c/:clientId
   };
+
+  const openClient = (id) => navigate(`/c/${id}`);
+  const displayName = auth.session?.displayName || 'Coach';
+
+  // Auth gate
+  if (auth.loading) {
+    return (
+      <div style={{
+        background: '#000', color: TK.textMute, minHeight: '100vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'Geist Mono, monospace', fontSize: 11,
+        letterSpacing: '0.20em', textTransform: 'uppercase',
+      }}>
+        <Loader2 size={16} style={{ animation: 'pk-spin 1s linear infinite', marginRight: 12 }} />
+        LOADING SESSION
+      </div>
+    );
+  }
+  if (!auth.session) return <SignIn />;
 
   const stats = {
     sessions: data.sessions.length,
@@ -1352,7 +1427,7 @@ export default function Hub() {
     <div className="pk-hub pk-grain">
       <style>{STYLES}</style>
       <div className="pk-spot" />
-      <Header onCmd={() => setPalette(true)} />
+      <Header onCmd={() => setPalette(true)} displayName={displayName} />
 
       {data.loading && <LoadingState />}
       {data.error && <ErrorState message={data.error} />}
@@ -1368,6 +1443,7 @@ export default function Hub() {
             q={q} setQ={setQ}
             clients={data.clients}
             onAddClient={() => setModal('add-client')}
+            onOpenClient={openClient}
           />
           <LibraryPanel
             templates={data.templates}
