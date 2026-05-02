@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Command, ArrowUpRight, ArrowRight, Plus, Sparkles,
-  Users, Library, Settings, Activity, ChevronRight, Filter,
-  MoreHorizontal, Clock, Send, X, CornerDownLeft, Zap, Loader2,
-  Check, Trophy, Calendar, LogOut,
+  Search, ArrowUpRight, ArrowRight, Plus, Sparkles,
+  Users, ChevronRight, Filter, Send, X, CornerDownLeft,
+  Zap, Loader2, Trophy, Activity, Calendar, LogOut,
+  ExternalLink, MessageSquare, ClipboardCheck,
 } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 import { useAuth, signOut, SignIn } from './lib/auth.jsx';
 
 // ─────────────────────────────────────────────────────────
 // PKFIT · IDENTITY ARCHITECT · PERCY KEITH
-// Operator console — Liquid Glass / true black / Geist
+// Operator console — pointing at real coaching schema
 // ─────────────────────────────────────────────────────────
 const TK = {
   field: '#000000',
@@ -32,16 +32,8 @@ const TK = {
 };
 
 const STYLES = `
-  :root {
-    --pk-field: #000;
-    --pk-text: #FAFAFA;
-    --pk-gold: #C9A961;
-  }
-
   .pk-hub { font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #FAFAFA; min-height: 100vh; }
   .pk-mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings: "tnum"; }
-
-  /* Liquid Glass surfaces */
   .pk-glass {
     background: rgba(250, 250, 250, 0.035);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
@@ -62,10 +54,8 @@ const STYLES = `
     backdrop-filter: blur(40px) saturate(200%);
     border: 1px solid rgba(201, 169, 97, 0.16);
   }
-
   .pk-row-hover { transition: background 180ms ease, border-color 180ms ease; }
   .pk-row-hover:hover { background: rgba(250,250,250,0.04); }
-
   .pk-cta {
     font-family: 'Geist Mono', monospace;
     letter-spacing: 0.16em; text-transform: uppercase;
@@ -77,7 +67,9 @@ const STYLES = `
   }
   .pk-cta:hover { transform: translateY(-1px); }
   .pk-cta:active { transform: translateY(0) scale(0.98); }
-
+  .pk-cta-gold {
+    background: #C9A961; color: #000;
+  }
   .pk-cta-ghost {
     font-family: 'Geist Mono', monospace;
     letter-spacing: 0.16em; text-transform: uppercase;
@@ -89,37 +81,27 @@ const STYLES = `
     transition: all 180ms ease;
   }
   .pk-cta-ghost:hover { background: rgba(250,250,250,0.07); border-color: rgba(250,250,250,0.18); }
-
   .pk-label {
     font-family: 'Geist Mono', monospace;
     letter-spacing: 0.20em; text-transform: uppercase;
     font-size: 10px; color: rgba(250,250,250,0.40); font-weight: 500;
   }
-
   .pk-display { font-weight: 800; letter-spacing: -0.04em; line-height: 0.92; }
-
-  /* Spotlight that follows cursor — subtle Bruce Wayne energy */
   .pk-spot {
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), rgba(201,169,97,0.06), transparent 50%);
     transition: background 80ms linear;
   }
-
-  /* Grain */
   .pk-grain::after {
     content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     opacity: 0.6; mix-blend-mode: overlay;
   }
-
-  /* Status dots */
   .pk-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
   .pk-dot-gold { background: #C9A961; box-shadow: 0 0 8px rgba(201,169,97,0.6); }
   .pk-dot-green { background: #6CC59A; box-shadow: 0 0 6px rgba(108,197,154,0.4); }
   .pk-dot-warn { background: #E0B97A; }
   .pk-dot-mute { background: rgba(250,250,250,0.25); }
-
-  /* Command palette */
   .pk-pal-overlay {
     position: fixed; inset: 0; z-index: 200;
     background: rgba(0,0,0,0.6);
@@ -131,7 +113,7 @@ const STYLES = `
   }
   @keyframes pk-fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes pk-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
+  @keyframes pk-spin { to { transform: rotate(360deg); } }
   .pk-kbd {
     font-family: 'Geist Mono', monospace; font-size: 10px;
     padding: 3px 6px; border-radius: 5px;
@@ -140,52 +122,33 @@ const STYLES = `
     color: rgba(250,250,250,0.62);
     letter-spacing: 0.04em;
   }
-
   .pk-link { color: rgba(250,250,250,0.62); text-decoration: none; transition: color 180ms ease; }
   .pk-link:hover { color: #FAFAFA; }
-
-  /* Scroll niceties */
   .pk-hub *::-webkit-scrollbar { width: 6px; height: 6px; }
   .pk-hub *::-webkit-scrollbar-thumb { background: rgba(250,250,250,0.10); border-radius: 3px; }
-
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 `;
 
-// ─────────────────────────────────────────────────────────
-// MOCK DATA
-// ─────────────────────────────────────────────────────────
-const COACH = { initials: 'PK', name: 'Percy Keith' };
+const INTAKE_URL = 'https://pkfit-intake.netlify.app/';
+const CHECKIN_URL = 'https://pkfit-checkin.netlify.app/';
 
 // ─────────────────────────────────────────────────────────
-// FORMATTERS
+// Formatters
 // ─────────────────────────────────────────────────────────
-const formatTime = (date) => {
-  const d = new Date(date);
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = ((h + 11) % 12) + 1;
-  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
-};
 const formatRelative = (date) => {
   if (!date) return '—';
   const ms = Date.now() - new Date(date).getTime();
-  const h = Math.floor(ms / (1000 * 60 * 60));
-  if (h < 1) return 'just now';
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
-};
-const formatNextDue = (date) => {
-  if (!date) return '—';
-  const d = new Date(date);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return formatTime(d);
-  const day = d.toLocaleDateString('en-US', { weekday: 'short' });
-  return `${day} ${formatTime(d)}`;
+  if (d < 30) return `${d}d ago`;
+  const mo = Math.floor(d / 30);
+  return `${mo}mo ago`;
 };
 const formatNow = () => {
   const d = new Date();
@@ -196,222 +159,168 @@ const formatNow = () => {
   };
 };
 
+// Derive a status dot from recent activity
+const deriveStatus = (lastActiveAt, hasRecentPR) => {
+  if (hasRecentPR) return 'gold';
+  if (!lastActiveAt) return 'mute';
+  const days = (Date.now() - new Date(lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (days < 3) return 'green';
+  if (days < 7) return 'green';
+  if (days < 14) return 'warn';
+  return 'mute';
+};
+
+// Detect a "PR" by scanning workout_sessions.exercises jsonb for new max weights
+const extractTopLifts = (sessions) => {
+  // sessions is sorted desc by performed_at
+  // exercises jsonb shape varies; try to be tolerant
+  const maxByLift = {}; // name -> { weight, sessionId }
+  for (const s of [...sessions].reverse()) {
+    const list = Array.isArray(s.exercises) ? s.exercises : (s.exercises?.items || []);
+    for (const ex of list) {
+      const name = ex.name || ex.exercise || ex.lift;
+      if (!name) continue;
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      const max = sets.reduce((m, set) => Math.max(m, Number(set.weight || set.lb || set.kg) || 0), 0);
+      if (max > 0 && (!maxByLift[name] || max > maxByLift[name].weight)) {
+        maxByLift[name] = { weight: max, sessionId: s.id, performed_at: s.performed_at };
+      }
+    }
+  }
+  return maxByLift;
+};
+
 // ─────────────────────────────────────────────────────────
-// DATA HOOK — live Supabase + mutations + realtime
+// Data hook — real tables
 // ─────────────────────────────────────────────────────────
-const useHub = () => {
+const useHub = (coachId) => {
   const [state, setState] = useState({
     loading: true, error: null,
-    clients: [], templates: [], sessions: [],
-    prCount: 0, weekDue: 0,
+    clients: [], recent: [],
+    activeClients: 0, sessionsThisWeek: 0, checkInsThisWeek: 0, newThisMonth: 0,
   });
 
   const fetchAll = async () => {
+    if (!coachId) return;
     try {
-      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();   endOfDay.setHours(23, 59, 59, 999);
-      const endOfWeek = new Date();  endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay())); endOfWeek.setHours(23, 59, 59, 999);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const [clientsRes, templatesRes, sessionsRes, prsRes, weekRes, futureRes] = await Promise.all([
-        supabase.from('pk_hub_clients').select('*').order('name'),
-        supabase.from('pk_hub_templates').select('*').order('uses', { ascending: false }),
-        supabase.from('pk_hub_sessions')
-          .select('id, due_at, status, tag, delta_note, client:pk_hub_clients(id, name, status), template:pk_hub_templates(id, name)')
-          .eq('status', 'due')
-          .gte('due_at', startOfDay.toISOString())
-          .lte('due_at', endOfDay.toISOString())
-          .order('due_at'),
-        supabase.from('pk_hub_prs').select('id', { count: 'exact', head: true })
-          .gte('logged_at', startOfDay.toISOString()),
-        supabase.from('pk_hub_sessions').select('id', { count: 'exact', head: true })
-          .eq('status', 'due')
-          .gte('due_at', startOfDay.toISOString())
-          .lte('due_at', endOfWeek.toISOString()),
-        supabase.from('pk_hub_sessions')
-          .select('client_id, due_at, status')
-          .eq('status', 'due')
-          .gte('due_at', new Date().toISOString())
-          .order('due_at'),
+      const [clientsRes, sessionsRes, checkInsRes, paymentsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, name, email, plan, start_date, loop_stage, created_at, avatar_path, coach_notes')
+          .eq('role', 'client')
+          .order('name'),
+        supabase
+          .from('workout_sessions')
+          .select('id, client_id, performed_at, duration_min, rpe_avg, notes')
+          .gte('performed_at', weekAgo)
+          .order('performed_at', { ascending: false }),
+        supabase
+          .from('check_ins')
+          .select('id, client_id, date, weight, body_fat, notes, photo_path, created_at')
+          .gte('date', weekAgo.split('T')[0])
+          .order('date', { ascending: false }),
+        supabase
+          .from('payments')
+          .select('client_id, status, plan, current_period_end'),
       ]);
 
-      const err = clientsRes.error || templatesRes.error || sessionsRes.error || prsRes.error;
+      const err = clientsRes.error || sessionsRes.error || checkInsRes.error;
       if (err) { setState((s) => ({ ...s, loading: false, error: err.message })); return; }
 
-      const nextDueByClient = {};
-      for (const r of (futureRes.data || [])) {
-        if (!nextDueByClient[r.client_id]) nextDueByClient[r.client_id] = r.due_at;
+      // Build a map of last activity per client (max of session + check-in)
+      const lastByClient = {};
+      for (const s of sessionsRes.data || []) {
+        const t = new Date(s.performed_at).getTime();
+        if (!lastByClient[s.client_id] || t > lastByClient[s.client_id]) lastByClient[s.client_id] = t;
+      }
+      for (const c of checkInsRes.data || []) {
+        const t = new Date(c.created_at).getTime();
+        if (!lastByClient[c.client_id] || t > lastByClient[c.client_id]) lastByClient[c.client_id] = t;
       }
 
-      const clients = (clientsRes.data || []).map((c) => ({
-        id: c.id, name: c.name, status: c.status,
-        tag: c.tag, notes: c.notes,
-        last: formatRelative(c.last_seen),
-        next: formatNextDue(nextDueByClient[c.id]),
-      }));
+      const paymentByClient = {};
+      for (const p of paymentsRes.data || []) {
+        if (!paymentByClient[p.client_id]) paymentByClient[p.client_id] = p;
+      }
 
-      const templates = (templatesRes.data || []).map((t) => ({
-        id: t.id, name: t.name, sets: t.sets,
-        time: `${t.duration_min}m`, uses: t.uses,
-      }));
+      const clients = (clientsRes.data || []).map((c) => {
+        const lastAt = lastByClient[c.id] ? new Date(lastByClient[c.id]).toISOString() : null;
+        const status = deriveStatus(lastAt, false);
+        return {
+          id: c.id, name: c.name || '—',
+          email: c.email,
+          plan: c.plan || paymentByClient[c.id]?.plan || '—',
+          tag: c.loop_stage || c.plan || '',
+          notes: c.coach_notes || '',
+          last: formatRelative(lastAt),
+          last_at: lastAt,
+          status,
+          paymentStatus: paymentByClient[c.id]?.status || null,
+        };
+      });
 
-      const sessions = (sessionsRes.data || []).map((s) => ({
-        id: s.id,
-        client: s.client?.name?.replace(/^(\w)\w+\s/, '$1. ') || 'Client',
-        client_id: s.client?.id,
-        template_id: s.template?.id,
-        tag: s.tag || s.template?.name || '',
-        due: formatTime(s.due_at),
-        status: s.client?.status || 'mute',
-        delta: s.delta_note || '',
-      }));
+      // Build recent activity feed (last 8 events)
+      const events = [
+        ...(sessionsRes.data || []).map((s) => ({
+          kind: 'session', id: `s-${s.id}`, client_id: s.client_id,
+          at: s.performed_at, label: 'logged a session',
+          detail: s.duration_min ? `${s.duration_min}m` : '',
+        })),
+        ...(checkInsRes.data || []).map((c) => ({
+          kind: 'check_in', id: `c-${c.id}`, client_id: c.client_id,
+          at: c.created_at, label: 'checked in',
+          detail: c.weight ? `${c.weight}kg` : '',
+        })),
+      ]
+        .sort((a, b) => new Date(b.at) - new Date(a.at))
+        .slice(0, 8);
+
+      const newThisMonth = (clientsRes.data || [])
+        .filter((c) => new Date(c.created_at).getTime() > new Date(monthAgo).getTime()).length;
 
       setState({
         loading: false, error: null,
-        clients, templates, sessions,
-        prCount: prsRes.count || 0,
-        weekDue: weekRes.count || 0,
+        clients,
+        recent: events,
+        activeClients: clients.length,
+        sessionsThisWeek: (sessionsRes.data || []).length,
+        checkInsThisWeek: (checkInsRes.data || []).length,
+        newThisMonth,
       });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: String(e) }));
     }
   };
 
-  // Initial fetch + realtime subscription
   useEffect(() => {
     fetchAll();
+    if (!coachId) return;
     const channel = supabase
-      .channel('pk-hub-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_clients' },  fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_sessions' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_prs' },      fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_templates' },fetchAll)
+      .channel('pk-console-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_sessions' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, fetchAll)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [coachId]);
 
-  // ── Mutations ────────────────────────────────────────────
-  const markSessionComplete = async (id) => {
-    // Optimistic
-    setState((s) => ({ ...s, sessions: s.sessions.filter((x) => x.id !== id) }));
-    const { error } = await supabase.from('pk_hub_sessions').update({ status: 'complete' }).eq('id', id);
-    if (error) await fetchAll();
-  };
-
-  const addClient = async ({ name, tag, status, notes }) => {
-    const { error } = await supabase.from('pk_hub_clients').insert({
-      name, tag, status: status || 'mute', notes,
-      last_seen: new Date().toISOString(),
-    });
-    if (error) throw error;
-    await fetchAll();
-  };
-
-  const logPR = async ({ client_id, lift, prev_lb, current_lb }) => {
-    const delta = Number(current_lb) - Number(prev_lb);
-    const { error } = await supabase.from('pk_hub_prs').insert({
-      client_id, lift, prev_lb: Number(prev_lb), current_lb: Number(current_lb), delta_lb: delta,
-    });
-    if (error) throw error;
-    await fetchAll();
-  };
-
-  const assignTemplate = async ({ client_id, template_id, due_at }) => {
-    const tpl = state.templates.find((t) => t.id === template_id);
-    const tag = (tpl?.name || '').split(' · ').slice(0, 2).join(' · ');
-    const { error } = await supabase.from('pk_hub_sessions').insert({
-      client_id, template_id,
-      due_at: new Date(due_at).toISOString(),
-      tag, status: 'due',
-    });
-    if (error) throw error;
-    await fetchAll();
-  };
-
-  return { ...state, mutations: { markSessionComplete, addClient, logPR, assignTemplate }, refetch: fetchAll };
+  return state;
 };
 
 const COMMANDS = [
-  { id: 'add-client',   label: 'Add new client...',              icon: Plus,     hint: 'Action' },
-  { id: 'log-pr',       label: 'Log a PR...',                    icon: Activity, hint: 'Action' },
-  { id: 'assign-tmpl',  label: 'Assign template...',             icon: Library,  hint: 'Action' },
-  { id: 'gen-workout',  label: 'Ask AI to generate a workout',   icon: Sparkles, hint: 'AI' },
-  { id: 'settings',     label: 'Open settings',                  icon: Settings, hint: 'Nav' },
+  { id: 'invite-client', label: 'Invite a new client...',         icon: Plus,             hint: 'Action' },
+  { id: 'request-checkin', label: 'Request a check-in...',        icon: ClipboardCheck,   hint: 'Action' },
+  { id: 'gen-workout',  label: 'Ask AI to generate a workout',    icon: Sparkles,         hint: 'AI' },
 ];
-
-// ─────────────────────────────────────────────────────────
-// MODAL — Liquid Glass overlay primitive
-// ─────────────────────────────────────────────────────────
-const Modal = ({ open, onClose, title, children, width = 520 }) => {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div className="pk-pal-overlay" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="pk-glass pk-glass-elev"
-        style={{
-          width: `min(${width}px, 92vw)`, padding: 0,
-          animation: 'pk-rise 220ms cubic-bezier(0.2,0.7,0.2,1) both',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-        }}
-      >
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 22px', borderBottom: `1px solid ${TK.hairline}`,
-        }}>
-          <div className="pk-mono" style={{
-            fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
-            color: TK.gold, fontWeight: 600,
-          }}>
-            {title}
-          </div>
-          <button onClick={onClose} style={{
-            background: 'transparent', border: 'none', color: TK.textMute,
-            cursor: 'pointer', padding: 4, borderRadius: 6,
-            display: 'flex', alignItems: 'center',
-          }}>
-            <X size={14} strokeWidth={2} />
-          </button>
-        </div>
-        <div style={{ padding: 22 }}>{children}</div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────
-// FORM PRIMITIVES
-// ─────────────────────────────────────────────────────────
-const Field = ({ label, children }) => (
-  <label style={{ display: 'block', marginBottom: 14 }}>
-    <div className="pk-label" style={{ marginBottom: 6 }}>{label}</div>
-    {children}
-  </label>
-);
-const inputStyle = {
-  width: '100%', padding: '10px 12px', borderRadius: 10,
-  background: 'rgba(0,0,0,0.4)', color: TK.text,
-  border: `1px solid ${TK.hairline}`, outline: 'none',
-  fontSize: 14, fontFamily: 'inherit',
-};
-const Input = (props) => <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
-const Select = ({ children, ...props }) => (
-  <select {...props} style={{ ...inputStyle, ...(props.style || {}) }}>{children}</select>
-);
-const TextArea = (props) => (
-  <textarea {...props} rows={props.rows || 2} style={{ ...inputStyle, resize: 'vertical', ...(props.style || {}) }} />
-);
 
 // ─────────────────────────────────────────────────────────
 // HEADER
 // ─────────────────────────────────────────────────────────
 const Header = ({ onCmd, displayName }) => {
-  const initials = (displayName || 'PK').split(' ').map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PK';
+  const initials = (displayName || 'PK').split(/\s+/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PK';
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header style={{
@@ -476,7 +385,7 @@ const Header = ({ onCmd, displayName }) => {
             }} />
             <div className="pk-glass pk-glass-elev" style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              minWidth: 200, padding: 8, zIndex: 60,
+              minWidth: 220, padding: 8, zIndex: 60,
               animation: 'pk-rise 180ms ease both',
               boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
             }}>
@@ -518,7 +427,7 @@ const Header = ({ onCmd, displayName }) => {
 };
 
 // ─────────────────────────────────────────────────────────
-// HERO — "WHAT'S NEXT?"
+// HERO
 // ─────────────────────────────────────────────────────────
 const Hero = ({ stats }) => {
   const NOW = useMemo(() => formatNow(), []);
@@ -530,16 +439,13 @@ const Hero = ({ stats }) => {
         marginBottom: 28, flexWrap: 'wrap', gap: 12,
       }}>
         <div className="pk-label">TODAY · OPERATOR'S CONSOLE</div>
-        <div className="pk-mono" style={{
-          fontSize: 12, color: TK.textDim, letterSpacing: '0.10em',
-        }}>
+        <div className="pk-mono" style={{ fontSize: 12, color: TK.textDim, letterSpacing: '0.10em' }}>
           {NOW.weekday} · {NOW.date} · {NOW.time}
         </div>
       </div>
 
       <h1 className="pk-display" style={{
-        fontSize: 'clamp(64px, 11vw, 168px)',
-        margin: 0, color: TK.text,
+        fontSize: 'clamp(64px, 11vw, 168px)', margin: 0, color: TK.text,
       }}>
         what's<br />
         <span style={{ color: TK.gold }}>next?</span>
@@ -549,10 +455,10 @@ const Hero = ({ stats }) => {
         marginTop: 36, display: 'flex', gap: 36, flexWrap: 'wrap',
         borderTop: `1px solid ${TK.hairline}`, paddingTop: 24,
       }}>
-        <Stat n={pad(stats.sessions)} label="due today" />
-        <Stat n={pad(stats.weekDue)} label="this week" accent />
-        <Stat n={pad(stats.prCount)} label="PR today" />
-        <Stat n={pad(stats.clients)} label="active clients" />
+        <Stat n={pad(stats.activeClients)} label="active clients" />
+        <Stat n={pad(stats.sessionsThisWeek)} label="sessions this week" accent />
+        <Stat n={pad(stats.checkInsThisWeek)} label="check-ins this week" />
+        <Stat n={pad(stats.newThisMonth)} label="new this month" />
       </div>
     </section>
   );
@@ -569,103 +475,76 @@ const Stat = ({ n, label, accent }) => (
 );
 
 // ─────────────────────────────────────────────────────────
-// TODAY GRID — sessions due
+// RECENT ACTIVITY (replaces "Due today")
 // ─────────────────────────────────────────────────────────
-const TodayGrid = ({ sessions, onComplete }) => (
-  <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-      <div className="pk-label">DUE TODAY · {sessions.length}</div>
-      <a href="#" className="pk-link pk-mono" style={{
-        fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        ALL SESSIONS <ArrowUpRight size={12} strokeWidth={2} />
-      </a>
-    </div>
-
-    {sessions.length === 0 ? (
-      <div className="pk-glass" style={{
-        padding: '40px 24px', textAlign: 'center',
-        color: TK.textDim, fontSize: 14,
-      }}>
-        <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.6 }}>—</div>
-        Day's clear. Good work.
+const RecentActivity = ({ events, clients, onOpenClient }) => {
+  const clientName = (id) => clients.find((c) => c.id === id)?.name || 'Client';
+  return (
+    <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div className="pk-label">RECENT ACTIVITY</div>
+        <span className="pk-mono" style={{ fontSize: 10, color: TK.textGhost, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+          LAST 7 DAYS
+        </span>
       </div>
-    ) : (
-      <div style={{
-        display: 'grid', gap: 14,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-      }}>
-        {sessions.map((s) => <SessionCard key={s.id} s={s} onComplete={onComplete} />)}
-      </div>
-    )}
-  </section>
-);
 
-const SessionCard = ({ s, onComplete }) => {
+      {events.length === 0 ? (
+        <div className="pk-glass" style={{
+          padding: '40px 24px', textAlign: 'center',
+          color: TK.textDim, fontSize: 14,
+        }}>
+          <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.6 }}>—</div>
+          Quiet week. Nothing logged yet.
+        </div>
+      ) : (
+        <div className="pk-glass" style={{ overflow: 'hidden' }}>
+          {events.map((e, i) => (
+            <ActivityRow
+              key={e.id}
+              event={e}
+              clientName={clientName(e.client_id)}
+              last={i === events.length - 1}
+              onClick={() => onOpenClient(e.client_id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+const ActivityRow = ({ event, clientName, last, onClick }) => {
   const [hover, setHover] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const handleComplete = async (e) => {
-    e.stopPropagation();
-    setCompleting(true);
-    setTimeout(() => onComplete?.(s.id), 380);
-  };
+  const Icon = event.kind === 'check_in' ? ClipboardCheck : Activity;
   return (
     <div
-      className="pk-glass"
+      onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding: 20, cursor: 'pointer',
-        borderColor: hover ? 'rgba(201,169,97,0.30)' : TK.hairline,
-        transform: completing ? 'scale(0.96)' : (hover ? 'translateY(-2px)' : 'translateY(0)'),
-        opacity: completing ? 0 : 1,
-        transition: 'all 380ms cubic-bezier(0.2,0.7,0.2,1)',
-        background: hover ? 'rgba(250,250,250,0.05)' : 'rgba(250,250,250,0.035)',
+        display: 'grid', gridTemplateColumns: '32px 1fr auto auto', gap: 14,
+        padding: '14px 20px', alignItems: 'center', cursor: 'pointer',
+        borderBottom: last ? 'none' : `1px solid ${TK.hairline}`,
+        background: hover ? 'rgba(250,250,250,0.04)' : 'transparent',
+        transition: 'background 180ms ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span className={`pk-dot pk-dot-${s.status}`} />
-        <span className="pk-mono" style={{ fontSize: 11, color: TK.textMute, letterSpacing: '0.10em' }}>
-          {s.due}
-        </span>
+      <Icon size={14} color={hover ? TK.gold : TK.textMute} strokeWidth={2} />
+      <div>
+        <div style={{ fontSize: 14, color: TK.text, letterSpacing: '-0.005em' }}>
+          <span style={{ fontWeight: 600 }}>{clientName}</span>
+          <span style={{ color: TK.textMute }}> {event.label}</span>
+        </div>
+        {event.detail && (
+          <div className="pk-mono" style={{ fontSize: 11, color: TK.textMute, marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {event.detail}
+          </div>
+        )}
       </div>
-      <div style={{
-        fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: TK.text, marginBottom: 6,
-      }}>
-        {s.client}
-      </div>
-      <div className="pk-mono" style={{
-        fontSize: 11, color: TK.textDim, letterSpacing: '0.08em', textTransform: 'uppercase',
-      }}>
-        {s.tag}
-      </div>
-      <div style={{
-        marginTop: 18, paddingTop: 14, borderTop: `1px solid ${TK.hairline}`,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-      }}>
-        <span style={{ fontSize: 12, color: TK.textMute, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {s.delta}
-        </span>
-        <button
-          onClick={handleComplete}
-          className="pk-mono"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 10px', borderRadius: 8,
-            background: hover ? TK.gold : 'rgba(201,169,97,0.10)',
-            color: hover ? '#000' : TK.gold,
-            border: `1px solid ${hover ? TK.gold : 'rgba(201,169,97,0.25)'}`,
-            cursor: 'pointer',
-            fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.14em', textTransform: 'uppercase',
-            fontFamily: 'Geist Mono, monospace',
-            transition: 'all 200ms ease',
-          }}
-        >
-          <Check size={11} strokeWidth={3} /> COMPLETE
-        </button>
-      </div>
+      <span className="pk-mono" style={{ fontSize: 11, color: TK.textMute, letterSpacing: '0.06em' }}>
+        {formatRelative(event.at)}
+      </span>
+      <ChevronRight size={14} color={hover ? TK.gold : TK.textGhost} strokeWidth={2} />
     </div>
   );
 };
@@ -673,11 +552,15 @@ const SessionCard = ({ s, onComplete }) => {
 // ─────────────────────────────────────────────────────────
 // CLIENTS TABLE
 // ─────────────────────────────────────────────────────────
-const ClientsPanel = ({ q, setQ, clients, onAddClient, onOpenClient }) => {
+const ClientsPanel = ({ q, setQ, clients, onOpenClient, onInvite }) => {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return clients;
-    return clients.filter(c => c.name.toLowerCase().includes(needle) || (c.tag || '').toLowerCase().includes(needle));
+    return clients.filter(c =>
+      c.name.toLowerCase().includes(needle) ||
+      (c.tag || '').toLowerCase().includes(needle) ||
+      (c.email || '').toLowerCase().includes(needle)
+    );
   }, [q, clients]);
 
   return (
@@ -696,28 +579,24 @@ const ClientsPanel = ({ q, setQ, clients, onAddClient, onOpenClient }) => {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search clients, tags…"
+              placeholder="Search clients, plans, emails…"
               style={{
                 background: 'transparent', border: 'none', outline: 'none',
-                color: TK.text, fontSize: 13, fontFamily: 'inherit',
-                width: '100%',
+                color: TK.text, fontSize: 13, fontFamily: 'inherit', width: '100%',
               }}
             />
           </div>
-          <button className="pk-cta-ghost" style={{ padding: '7px 14px' }}>
-            <Filter size={12} strokeWidth={2} /> FILTER
-          </button>
-          <button onClick={onAddClient} className="pk-cta" style={{ padding: '7px 14px' }}>
-            <Plus size={13} strokeWidth={2.4} /> NEW CLIENT
+          <button onClick={onInvite} className="pk-cta pk-cta-gold" style={{ padding: '7px 14px' }}>
+            <Plus size={13} strokeWidth={2.4} /> INVITE CLIENT
+            <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
           </button>
         </div>
       </div>
 
       <div className="pk-glass" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* table head */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '24px 1.6fr 1fr 0.9fr 1fr 24px',
+          gridTemplateColumns: '24px 1.6fr 1fr 1fr 1fr 24px',
           gap: 16, padding: '14px 20px',
           borderBottom: `1px solid ${TK.hairline}`,
           fontFamily: 'Geist Mono, monospace',
@@ -726,19 +605,34 @@ const ClientsPanel = ({ q, setQ, clients, onAddClient, onOpenClient }) => {
         }}>
           <span></span>
           <span>Client</span>
-          <span>Block</span>
+          <span>Plan</span>
+          <span>Status</span>
           <span>Last seen</span>
-          <span>Next due</span>
           <span></span>
         </div>
-        {filtered.map((c, i) => (
-          <ClientRow key={c.id} c={c} last={i === filtered.length - 1} onOpen={onOpenClient} />
-        ))}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && clients.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+            <div className="pk-mono" style={{
+              fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+              color: TK.textMute, marginBottom: 12,
+            }}>
+              NO CLIENTS YET
+            </div>
+            <div style={{ fontSize: 13, color: TK.textDim, marginBottom: 18, maxWidth: 360, margin: '0 auto 18px' }}>
+              Send a client through the intake flow to get started.
+            </div>
+            <button onClick={onInvite} className="pk-cta pk-cta-gold" style={{ padding: '10px 18px' }}>
+              <Plus size={13} strokeWidth={2.4} /> INVITE FIRST CLIENT
+              <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ padding: '32px 20px', textAlign: 'center', color: TK.textMute, fontSize: 13 }}>
             No matches.
           </div>
-        )}
+        ) : filtered.map((c, i) => (
+          <ClientRow key={c.id} c={c} last={i === filtered.length - 1} onOpen={onOpenClient} />
+        ))}
       </div>
     </section>
   );
@@ -754,7 +648,7 @@ const ClientRow = ({ c, last, onOpen }) => {
       className="pk-row-hover"
       style={{
         display: 'grid',
-        gridTemplateColumns: '24px 1.6fr 1fr 0.9fr 1fr 24px',
+        gridTemplateColumns: '24px 1.6fr 1fr 1fr 1fr 24px',
         gap: 16, padding: '16px 20px',
         borderBottom: last ? 'none' : `1px solid ${TK.hairline}`,
         alignItems: 'center', cursor: 'pointer',
@@ -764,16 +658,18 @@ const ClientRow = ({ c, last, onOpen }) => {
       <span className={`pk-dot pk-dot-${c.status}`} />
       <div>
         <div style={{ fontSize: 14, fontWeight: 600, color: TK.text, letterSpacing: '-0.01em' }}>{c.name}</div>
-        <div style={{ fontSize: 12, color: TK.textMute, marginTop: 2 }}>{c.notes}</div>
+        {c.email && (
+          <div style={{ fontSize: 12, color: TK.textMute, marginTop: 2 }}>{c.email}</div>
+        )}
       </div>
       <span className="pk-mono" style={{ fontSize: 11, color: TK.textDim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-        {c.tag}
+        {c.plan || '—'}
+      </span>
+      <span className="pk-mono" style={{ fontSize: 11, color: TK.textDim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        {c.paymentStatus || c.status}
       </span>
       <span className="pk-mono" style={{ fontSize: 12, color: TK.textMute }}>
         {c.last}
-      </span>
-      <span className="pk-mono" style={{ fontSize: 12, color: TK.text, letterSpacing: '0.04em' }}>
-        {c.next}
       </span>
       <ChevronRight size={14} color={hover ? TK.gold : TK.textGhost} strokeWidth={2} />
     </div>
@@ -781,81 +677,8 @@ const ClientRow = ({ c, last, onOpen }) => {
 };
 
 // ─────────────────────────────────────────────────────────
-// LIBRARY
+// AI PANEL — demo mode
 // ─────────────────────────────────────────────────────────
-const LibraryPanel = ({ templates, onAssign }) => (
-  <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-      <div className="pk-label">LIBRARY · TEMPLATES</div>
-      <button className="pk-cta-ghost" style={{ padding: '7px 14px' }}>
-        <Plus size={12} strokeWidth={2.4} /> NEW TEMPLATE
-      </button>
-    </div>
-    <div style={{
-      display: 'grid', gap: 12,
-      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-    }}>
-      {templates.map((t) => <TemplateCard key={t.id} t={t} onAssign={onAssign} />)}
-    </div>
-  </section>
-);
-
-const TemplateCard = ({ t, onAssign }) => {
-  const [hover, setHover] = useState(false);
-  return (
-    <div
-      className="pk-glass"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        padding: 18, position: 'relative',
-        borderColor: hover ? 'rgba(201,169,97,0.28)' : TK.hairline,
-        transition: 'all 220ms ease',
-      }}
-    >
-      <div className="pk-mono" style={{
-        fontSize: 13, fontWeight: 600, color: TK.text,
-        letterSpacing: '0.06em', marginBottom: 14,
-      }}>
-        {t.name}
-      </div>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between',
-        fontFamily: 'Geist Mono, monospace', fontSize: 11, color: TK.textMute,
-        letterSpacing: '0.10em', textTransform: 'uppercase',
-      }}>
-        <span>{t.sets} sets</span>
-        <span>{t.time}</span>
-        <span>{t.uses}× used</span>
-      </div>
-      <button
-        onClick={() => onAssign?.(t.id)}
-        className="pk-mono"
-        style={{
-          position: 'absolute', top: 12, right: 12,
-          padding: '5px 9px', borderRadius: 7,
-          background: hover ? TK.gold : 'transparent',
-          color: hover ? '#000' : TK.textMute,
-          border: `1px solid ${hover ? TK.gold : 'transparent'}`,
-          cursor: 'pointer',
-          fontSize: 9, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          fontFamily: 'Geist Mono, monospace',
-          transition: 'all 200ms ease',
-          opacity: hover ? 1 : 0,
-        }}
-      >
-        ASSIGN
-      </button>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────
-// AI PANEL
-// ─────────────────────────────────────────────────────────
-// Demo-mode AI: returns a structured response without an API key.
-// Replace with a real LLM call (Edge Function → Anthropic/Gemini) when ready.
 const aiDemoResponse = async (prompt) => {
   await new Promise((r) => setTimeout(r, 900 + Math.random() * 600));
   const p = prompt.toLowerCase();
@@ -869,7 +692,6 @@ const aiDemoResponse = async (prompt) => {
       'Wk 4 · Test     — 3×3 @ RPE 9.5 · then deload Sat',
       '',
       'Anchor lifts: weighted pull-up, pendlay row, RDL.',
-      'Accessory rotation: face pull, hammer curl, rear-delt fly.',
     ].join('\n');
   }
   if (p.includes('plateau') || p.includes('bench')) {
@@ -877,13 +699,8 @@ const aiDemoResponse = async (prompt) => {
       'BENCH PLATEAU · 3 LIKELY CAUSES',
       '',
       '1. Top-end weakness — last 3" lockout failing.',
-      '   → 2× weekly close-grip + board press 1-board.',
-      '',
       '2. Tricep underload — bench drives shoulder-heavy.',
-      '   → Add JM press OR overhead tri ext, 4×10 RPE 7.',
-      '',
       '3. Recovery debt — sleep <7h, training 5×.',
-      '   → Drop 1 day, retest in 14 days.',
     ].join('\n');
   }
   if (p.includes('deload')) {
@@ -895,29 +712,11 @@ const aiDemoResponse = async (prompt) => {
       'Wed · Pull  — 50% top set, 3× across',
       'Thu · Mobility 24m',
       'Fri · Legs  — 50% top set, 3× across',
-      'Sat · Walk + sauna',
-      '',
-      'Goal: 60% volume, full ROM, fresh CNS by Monday.',
-    ].join('\n');
-  }
-  if (p.includes('meal') || p.includes('protein')) {
-    return [
-      'MEAL PLAN · 180G PROTEIN · DAIRY-FREE',
-      '',
-      '07:00 · 4 eggs + oats + berries        ─ 38g',
-      '11:00 · Chicken thigh + jasmine rice   ─ 42g',
-      '14:00 · Beef jerky + apple             ─ 22g',
-      '18:00 · Salmon + sweet potato + greens ─ 40g',
-      '21:00 · Whey isolate + almond butter   ─ 38g',
-      '',
-      'Total: 180g. No dairy. ~2,400 kcal.',
     ].join('\n');
   }
   return [
-    'I read the brief. To deliver real output I need an LLM key.',
-    '',
-    'Drop your Anthropic or Gemini key into Settings → AI to',
-    'switch from demo mode to live coach generation.',
+    'I read the brief. Live LLM wiring is one Edge Function away.',
+    'Drop your Anthropic or Gemini key into Settings → AI to switch on.',
   ].join('\n');
 };
 
@@ -926,22 +725,19 @@ const AIPanel = ({ initialPrompt }) => {
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState('');
   const prompts = [
-    'Generate a 4-week pull block for J. Kim',
-    'Why did M. Rivera plateau on bench?',
-    'Build a deload week for D. Santos',
+    'Generate a 4-week pull block',
+    'Why might a client plateau on bench?',
+    'Build a deload week template',
     'Suggest a meal plan for 180g protein, dairy-free',
   ];
 
-  useEffect(() => {
-    if (initialPrompt) setQ(initialPrompt);
-  }, [initialPrompt]);
+  useEffect(() => { if (initialPrompt) setQ(initialPrompt); }, [initialPrompt]);
 
   const submit = async () => {
     if (!q.trim() || busy) return;
     setBusy(true); setOut('');
     const result = await aiDemoResponse(q);
-    setOut(result);
-    setBusy(false);
+    setOut(result); setBusy(false);
   };
 
   return (
@@ -1035,170 +831,6 @@ const AIPanel = ({ initialPrompt }) => {
 };
 
 // ─────────────────────────────────────────────────────────
-// MUTATION MODALS
-// ─────────────────────────────────────────────────────────
-const AddClientModal = ({ open, onClose, onSubmit }) => {
-  const [name, setName] = useState('');
-  const [tag, setTag] = useState('');
-  const [status, setStatus] = useState('mute');
-  const [notes, setNotes] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (open) { setName(''); setTag(''); setStatus('mute'); setNotes(''); setErr(''); }
-  }, [open]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) { setErr('Name is required.'); return; }
-    setBusy(true); setErr('');
-    try { await onSubmit({ name: name.trim(), tag: tag.trim(), status, notes: notes.trim() }); onClose(); }
-    catch (e) { setErr(e.message || String(e)); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title="ADD CLIENT">
-      <form onSubmit={submit}>
-        <Field label="NAME"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Eli Schwartz" /></Field>
-        <Field label="BLOCK / TAG"><Input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Push · Hypertrophy" /></Field>
-        <Field label="STATUS">
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="mute">Mute · new / quiet</option>
-            <option value="green">Green · on track</option>
-            <option value="gold">Gold · momentum / PR</option>
-            <option value="warn">Warn · needs attention</option>
-          </Select>
-        </Field>
-        <Field label="NOTES"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Returning from knee tweak. Light start." /></Field>
-        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
-          <button type="submit" className="pk-cta" disabled={busy}>
-            {busy ? <><Loader2 size={12} className="pk-spin" style={{ animation: 'pk-spin 1s linear infinite' }} /> SAVING</> : <>SAVE CLIENT</>}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-const LogPRModal = ({ open, onClose, onSubmit, clients }) => {
-  const [clientId, setClientId] = useState('');
-  const [lift, setLift] = useState('');
-  const [prev, setPrev] = useState('');
-  const [curr, setCurr] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setClientId(clients[0]?.id || '');
-      setLift(''); setPrev(''); setCurr(''); setErr('');
-    }
-  }, [open, clients]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!clientId || !lift.trim() || !prev || !curr) { setErr('All fields are required.'); return; }
-    setBusy(true); setErr('');
-    try { await onSubmit({ client_id: clientId, lift: lift.trim(), prev_lb: prev, current_lb: curr }); onClose(); }
-    catch (e) { setErr(e.message || String(e)); }
-    finally { setBusy(false); }
-  };
-
-  const delta = (Number(curr) - Number(prev)) || 0;
-
-  return (
-    <Modal open={open} onClose={onClose} title="LOG A PR">
-      <form onSubmit={submit}>
-        <Field label="CLIENT">
-          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="LIFT"><Input autoFocus value={lift} onChange={(e) => setLift(e.target.value)} placeholder="Overhead Press" /></Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="PREVIOUS (LB)"><Input type="number" value={prev} onChange={(e) => setPrev(e.target.value)} placeholder="140" /></Field>
-          <Field label="NEW (LB)"><Input type="number" value={curr} onChange={(e) => setCurr(e.target.value)} placeholder="145" /></Field>
-        </div>
-        {delta !== 0 && (
-          <div className="pk-mono" style={{
-            padding: '10px 14px', borderRadius: 10,
-            background: delta > 0 ? 'rgba(201,169,97,0.10)' : 'rgba(224,122,108,0.10)',
-            border: `1px solid ${delta > 0 ? 'rgba(201,169,97,0.25)' : 'rgba(224,122,108,0.25)'}`,
-            color: delta > 0 ? TK.gold : TK.danger,
-            fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase',
-            marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <Trophy size={12} strokeWidth={2.4} />
-            {delta > 0 ? '+' : ''}{delta} LB
-          </div>
-        )}
-        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
-          <button type="submit" className="pk-cta" disabled={busy}>{busy ? 'LOGGING…' : 'LOG PR'}</button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-const AssignTemplateModal = ({ open, onClose, onSubmit, clients, templates, prefilledTemplateId }) => {
-  const [clientId, setClientId] = useState('');
-  const [templateId, setTemplateId] = useState('');
-  const [dueAt, setDueAt] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setClientId(clients[0]?.id || '');
-      setTemplateId(prefilledTemplateId || templates[0]?.id || '');
-      // default to today 6 PM in local-ISO format for datetime-local input
-      const d = new Date(); d.setHours(18, 0, 0, 0);
-      const pad = (n) => String(n).padStart(2, '0');
-      setDueAt(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-      setErr('');
-    }
-  }, [open, clients, templates, prefilledTemplateId]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!clientId || !templateId || !dueAt) { setErr('All fields are required.'); return; }
-    setBusy(true); setErr('');
-    try { await onSubmit({ client_id: clientId, template_id: templateId, due_at: dueAt }); onClose(); }
-    catch (e) { setErr(e.message || String(e)); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title="ASSIGN TEMPLATE">
-      <form onSubmit={submit}>
-        <Field label="CLIENT">
-          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="TEMPLATE">
-          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="DUE"><Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} /></Field>
-        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
-          <button type="submit" className="pk-cta" disabled={busy}>{busy ? 'ASSIGNING…' : 'ASSIGN'}</button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-// ─────────────────────────────────────────────────────────
 // COMMAND PALETTE
 // ─────────────────────────────────────────────────────────
 const Palette = ({ open, onClose, clients, onAction }) => {
@@ -1212,17 +844,14 @@ const Palette = ({ open, onClose, clients, onAction }) => {
 
   const items = useMemo(() => {
     const cmds = COMMANDS.map(c => ({ kind: 'cmd', ...c }));
-    const cls = clients.slice(0, 5).map(c => ({ kind: 'client', id: c.id, label: c.name, sub: c.tag, icon: Users }));
+    const cls = clients.slice(0, 8).map(c => ({ kind: 'client', id: c.id, label: c.name, sub: c.email || c.tag, icon: Users }));
     const all = [...cmds, ...cls];
     if (!q.trim()) return all;
     const n = q.trim().toLowerCase();
     return all.filter(i => i.label.toLowerCase().includes(n) || (i.sub || '').toLowerCase().includes(n));
   }, [q, clients]);
 
-  const choose = (item) => {
-    onAction?.(item);
-    onClose();
-  };
+  const choose = (item) => { onAction?.(item); onClose(); };
 
   useEffect(() => {
     if (!open) return;
@@ -1273,7 +902,7 @@ const Palette = ({ open, onClose, clients, onAction }) => {
             </div>
           )}
           {items.map((it, i) => {
-            const Icon = it.icon || Command;
+            const Icon = it.icon || Users;
             const isActive = i === active;
             return (
               <div
@@ -1293,7 +922,7 @@ const Palette = ({ open, onClose, clients, onAction }) => {
                   {it.sub && (
                     <div className="pk-mono" style={{
                       fontSize: 11, color: TK.textMute, marginTop: 2,
-                      letterSpacing: '0.06em', textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
                     }}>{it.sub}</div>
                   )}
                 </div>
@@ -1352,14 +981,46 @@ const Footer = () => (
 // ─────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────
+const LoadingState = () => (
+  <div style={{
+    minHeight: '60vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 18,
+    color: 'rgba(250,250,250,0.40)',
+  }}>
+    <Loader2 size={20} style={{ animation: 'pk-spin 1s linear infinite' }} strokeWidth={2} />
+    <div className="pk-mono" style={{
+      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+    }}>
+      LOADING · OPERATOR'S CONSOLE
+    </div>
+  </div>
+);
+
+const ErrorState = ({ message }) => (
+  <div style={{
+    minHeight: '60vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 14,
+    padding: 28, textAlign: 'center',
+  }}>
+    <div className="pk-mono" style={{
+      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+      color: 'rgba(224,122,108,0.85)',
+    }}>
+      CONNECTION ERROR
+    </div>
+    <div style={{ fontSize: 13, color: 'rgba(250,250,250,0.62)', maxWidth: 480 }}>
+      {message}
+    </div>
+  </div>
+);
+
 export default function Hub() {
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
-  const [modal, setModal] = useState(null); // 'add-client' | 'log-pr' | 'assign-tmpl' | { kind: 'assign-tmpl', templateId }
   const [aiSeed, setAiSeed] = useState('');
   const auth = useAuth();
   const navigate = useNavigate();
-  const data = useHub();
+  const data = useHub(auth.session?.uid);
 
   // Cursor spotlight
   useEffect(() => {
@@ -1383,23 +1044,6 @@ export default function Hub() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const handleCommand = (item) => {
-    if (item.kind === 'cmd') {
-      if (item.id === 'add-client') setModal('add-client');
-      else if (item.id === 'log-pr') setModal('log-pr');
-      else if (item.id === 'assign-tmpl') setModal({ kind: 'assign-tmpl' });
-      else if (item.id === 'gen-workout') {
-        setAiSeed('Generate a 4-week pull block for J. Kim');
-        setTimeout(() => document.getElementById('ai-panel')?.scrollIntoView({ behavior: 'smooth' }), 100);
-      }
-    } else if (item.kind === 'client') {
-      navigate(`/c/${item.id}`);
-    }
-  };
-
-  const openClient = (id) => navigate(`/c/${id}`);
-  const displayName = auth.session?.displayName || 'Coach';
-
   // Auth gate
   if (auth.loading) {
     return (
@@ -1416,18 +1060,34 @@ export default function Hub() {
   }
   if (!auth.session) return <SignIn />;
 
+  const openClient = (id) => navigate(`/c/${id}`);
+  const openIntake = () => window.open(INTAKE_URL, '_blank');
+
+  const handleCommand = (item) => {
+    if (item.kind === 'cmd') {
+      if (item.id === 'invite-client') openIntake();
+      else if (item.id === 'request-checkin') window.open(CHECKIN_URL, '_blank');
+      else if (item.id === 'gen-workout') {
+        setAiSeed('Generate a 4-week pull block');
+        setTimeout(() => document.getElementById('ai-panel')?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
+    } else if (item.kind === 'client') {
+      navigate(`/c/${item.id}`);
+    }
+  };
+
   const stats = {
-    sessions: data.sessions.length,
-    weekDue: data.weekDue,
-    prCount: data.prCount,
-    clients: data.clients.length,
+    activeClients: data.activeClients,
+    sessionsThisWeek: data.sessionsThisWeek,
+    checkInsThisWeek: data.checkInsThisWeek,
+    newThisMonth: data.newThisMonth,
   };
 
   return (
     <div className="pk-hub pk-grain">
       <style>{STYLES}</style>
       <div className="pk-spot" />
-      <Header onCmd={() => setPalette(true)} displayName={displayName} />
+      <Header onCmd={() => setPalette(true)} displayName={auth.session.displayName} />
 
       {data.loading && <LoadingState />}
       {data.error && <ErrorState message={data.error} />}
@@ -1435,19 +1095,12 @@ export default function Hub() {
       {!data.loading && !data.error && (
         <>
           <Hero stats={stats} />
-          <TodayGrid
-            sessions={data.sessions}
-            onComplete={data.mutations.markSessionComplete}
-          />
+          <RecentActivity events={data.recent} clients={data.clients} onOpenClient={openClient} />
           <ClientsPanel
             q={q} setQ={setQ}
             clients={data.clients}
-            onAddClient={() => setModal('add-client')}
             onOpenClient={openClient}
-          />
-          <LibraryPanel
-            templates={data.templates}
-            onAssign={(templateId) => setModal({ kind: 'assign-tmpl', templateId })}
+            onInvite={openIntake}
           />
           <AIPanel initialPrompt={aiSeed} />
         </>
@@ -1461,59 +1114,6 @@ export default function Hub() {
         clients={data.clients}
         onAction={handleCommand}
       />
-      <AddClientModal
-        open={modal === 'add-client'}
-        onClose={() => setModal(null)}
-        onSubmit={data.mutations.addClient}
-      />
-      <LogPRModal
-        open={modal === 'log-pr'}
-        onClose={() => setModal(null)}
-        onSubmit={data.mutations.logPR}
-        clients={data.clients}
-      />
-      <AssignTemplateModal
-        open={!!modal && typeof modal === 'object' && modal.kind === 'assign-tmpl'}
-        onClose={() => setModal(null)}
-        onSubmit={data.mutations.assignTemplate}
-        clients={data.clients}
-        templates={data.templates}
-        prefilledTemplateId={typeof modal === 'object' ? modal?.templateId : ''}
-      />
     </div>
   );
 }
-
-const LoadingState = () => (
-  <div style={{
-    minHeight: '60vh', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: 18,
-    color: 'rgba(250,250,250,0.40)',
-  }}>
-    <Loader2 size={20} className="pk-spin" style={{ animation: 'pk-spin 1s linear infinite' }} strokeWidth={2} />
-    <div className="pk-mono" style={{
-      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
-    }}>
-      LOADING · OPERATOR'S CONSOLE
-    </div>
-    <style>{`@keyframes pk-spin { to { transform: rotate(360deg); } }`}</style>
-  </div>
-);
-
-const ErrorState = ({ message }) => (
-  <div style={{
-    minHeight: '60vh', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: 14,
-    padding: 28, textAlign: 'center',
-  }}>
-    <div className="pk-mono" style={{
-      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
-      color: 'rgba(224,122,108,0.85)',
-    }}>
-      CONNECTION ERROR
-    </div>
-    <div style={{ fontSize: 13, color: 'rgba(250,250,250,0.62)', maxWidth: 480 }}>
-      {message}
-    </div>
-  </div>
-);
