@@ -128,13 +128,13 @@ const Header = ({ name }) => (
     WebkitBackdropFilter: 'blur(20px) saturate(160%)',
     borderBottom: `1px solid ${TK.hairline}`,
   }}>
-    <Link to="/hub" style={{
+    <Link to="/console" style={{
       display: 'flex', alignItems: 'center', gap: 10,
       color: TK.textDim, textDecoration: 'none',
       fontFamily: 'Geist Mono, monospace', fontSize: 11,
       letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 600,
     }}>
-      <ArrowLeft size={13} strokeWidth={2} /> BACK TO HUB
+      <ArrowLeft size={13} strokeWidth={2} /> BACK TO CONSOLE
     </Link>
     <div className="pk-cd-mono" style={{
       fontSize: 10, letterSpacing: '0.20em', textTransform: 'uppercase',
@@ -617,13 +617,13 @@ export default function ClientDetail() {
           }}>
             CLIENT NOT FOUND
           </div>
-          <button onClick={() => navigate('/hub')} className="pk-cd-mono" style={{
+          <button onClick={() => navigate('/console')} className="pk-cd-mono" style={{
             padding: '10px 16px', borderRadius: 10,
             background: 'transparent', border: `1px solid ${TK.hairline}`,
             color: TK.textDim, cursor: 'pointer',
             fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
           }}>
-            ← BACK TO HUB
+            ← BACK TO CONSOLE
           </button>
         </div>
       )}
