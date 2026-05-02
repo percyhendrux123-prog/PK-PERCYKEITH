@@ -5,6 +5,18 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Permanent rebrand: /hub → /console
+[[redirects]]
+  from = "/hub"
+  to = "/console"
+  status = 301
+
+[[redirects]]
+  from = "/hub/*"
+  to = "/console/:splat"
+  status = 301
+
+# SPA fallback (must come last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
