@@ -1,57 +1,96 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, ArrowRight, Lock } from 'lucide-react';
+import { supabase } from './supabase.js';
 
 // ─────────────────────────────────────────────────────────
-// Cosmetic auth gate.
-// Stores a display name in localStorage; replace with real
-// Supabase Auth (anon, email, or passkey) before production.
+// Auth: Supabase anonymous sign-in (real session) with
+// localStorage fallback so the UX never breaks if the
+// project hasn't enabled anonymous sign-ins yet.
 // ─────────────────────────────────────────────────────────
-const STORAGE_KEY = 'pk-hub-session';
+const STORAGE_KEY = 'pk-hub-fallback-session';
 
-const readSession = () => {
+const readLocal = () => {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 };
-
-const writeSession = (s) => {
+const writeLocal = (s) => {
   try {
     if (s) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     else window.localStorage.removeItem(STORAGE_KEY);
   } catch {}
-  window.dispatchEvent(new CustomEvent('pk-hub-session-change'));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pk-hub-session-change'));
+  }
 };
+
+const sessionFromSupabase = (s) => s ? ({
+  displayName: s.user?.user_metadata?.display_name || 'Coach',
+  source: 'supabase',
+  uid: s.user?.id,
+}) : null;
 
 export const useAuth = () => {
   const [state, setState] = useState({ loading: true, session: null });
 
   useEffect(() => {
-    setState({ loading: false, session: readSession() });
-    const handler = () => setState({ loading: false, session: readSession() });
-    window.addEventListener('storage', handler);
-    window.addEventListener('pk-hub-session-change', handler);
+    let mounted = true;
+
+    const apply = (sbSession) => {
+      if (!mounted) return;
+      if (sbSession) {
+        setState({ loading: false, session: sessionFromSupabase(sbSession) });
+      } else {
+        setState({ loading: false, session: readLocal() });
+      }
+    };
+
+    supabase.auth.getSession().then(({ data }) => apply(data.session));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => apply(session));
+
+    const onLocalChange = () => {
+      if (!mounted) return;
+      // Recheck Supabase first so signing out from supabase doesn't get masked by stale localStorage
+      supabase.auth.getSession().then(({ data }) => apply(data.session));
+    };
+    window.addEventListener('storage', onLocalChange);
+    window.addEventListener('pk-hub-session-change', onLocalChange);
+
     return () => {
-      window.removeEventListener('storage', handler);
-      window.removeEventListener('pk-hub-session-change', handler);
+      mounted = false;
+      subscription.unsubscribe();
+      window.removeEventListener('storage', onLocalChange);
+      window.removeEventListener('pk-hub-session-change', onLocalChange);
     };
   }, []);
 
   return state;
 };
 
-export const signIn = ({ displayName }) => {
-  writeSession({
-    displayName: (displayName || 'Coach').trim(),
-    signedInAt: new Date().toISOString(),
-  });
+export const signIn = async ({ displayName }) => {
+  const name = (displayName || 'Coach').trim();
+  try {
+    const { data, error } = await supabase.auth.signInAnonymously({
+      options: { data: { display_name: name } },
+    });
+    if (error) throw error;
+    return { source: 'supabase', session: data.session };
+  } catch (e) {
+    writeLocal({ displayName: name, source: 'local', signedInAt: new Date().toISOString() });
+    return { source: 'local', error: e?.message };
+  }
 };
 
-export const signOut = () => writeSession(null);
+export const signOut = async () => {
+  await supabase.auth.signOut().catch(() => {});
+  writeLocal(null);
+};
 
 // ─────────────────────────────────────────────────────────
-// SignIn — minimal, on-brand
+// SignIn screen
 // ─────────────────────────────────────────────────────────
 const TK = {
   text: '#FAFAFA',
@@ -60,18 +99,26 @@ const TK = {
   textGhost: 'rgba(250,250,250,0.22)',
   hairline: 'rgba(250,250,250,0.08)',
   gold: '#C9A961',
+  warn: '#E0B97A',
   danger: '#E07A6C',
 };
 
 export const SignIn = () => {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [warn, setWarn] = useState('');
 
-  const enter = (e) => {
+  const enter = async (e) => {
     e?.preventDefault?.();
     if (busy) return;
-    setBusy(true);
-    setTimeout(() => signIn({ displayName: name }), 180);
+    setBusy(true); setWarn('');
+    const result = await signIn({ displayName: name });
+    // useAuth subscriber will pick up the session and unmount this screen.
+    if (result.source === 'local') {
+      setWarn('Real auth provider unavailable — running in fallback mode.');
+      // stay on the screen briefly to show the message? No — proceed.
+    }
+    setBusy(false);
   };
 
   return (
@@ -146,6 +193,16 @@ export const SignIn = () => {
             }}
           />
         </label>
+
+        {warn && (
+          <div style={{
+            color: TK.warn, fontSize: 11, marginBottom: 14,
+            fontFamily: 'Geist Mono, monospace',
+            letterSpacing: '0.04em',
+          }}>
+            {warn}
+          </div>
+        )}
 
         <button
           type="submit"
