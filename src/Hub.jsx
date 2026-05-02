@@ -3,6 +3,7 @@ import {
   Search, Command, ArrowUpRight, ArrowRight, Plus, Sparkles,
   Users, Library, Settings, Activity, ChevronRight, Filter,
   MoreHorizontal, Clock, Send, X, CornerDownLeft, Zap, Loader2,
+  Check, Trophy, Calendar,
 } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 
@@ -194,89 +195,215 @@ const formatNow = () => {
 };
 
 // ─────────────────────────────────────────────────────────
-// DATA HOOK — pulls live from Supabase pk_hub_* tables
+// DATA HOOK — live Supabase + mutations + realtime
 // ─────────────────────────────────────────────────────────
-const useHubData = () => {
-  const [state, setState] = useState({ loading: true, error: null, clients: [], templates: [], sessions: [], prCount: 0 });
+const useHub = () => {
+  const [state, setState] = useState({
+    loading: true, error: null,
+    clients: [], templates: [], sessions: [],
+    prCount: 0, weekDue: 0,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date();   endOfDay.setHours(23, 59, 59, 999);
+  const fetchAll = async () => {
+    try {
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();   endOfDay.setHours(23, 59, 59, 999);
+      const endOfWeek = new Date();  endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay())); endOfWeek.setHours(23, 59, 59, 999);
 
-        const [clientsRes, templatesRes, sessionsRes, prsRes] = await Promise.all([
-          supabase.from('pk_hub_clients').select('*').order('name'),
-          supabase.from('pk_hub_templates').select('*').order('uses', { ascending: false }),
-          supabase.from('pk_hub_sessions')
-            .select('id, due_at, status, tag, delta_note, client:pk_hub_clients(id, name, status), template:pk_hub_templates(id, name)')
-            .gte('due_at', startOfDay.toISOString())
-            .lte('due_at', endOfDay.toISOString())
-            .order('due_at'),
-          supabase.from('pk_hub_prs').select('id', { count: 'exact', head: true })
-            .gte('logged_at', startOfDay.toISOString()),
-        ]);
-
-        if (cancelled) return;
-        const err = clientsRes.error || templatesRes.error || sessionsRes.error || prsRes.error;
-        if (err) { setState((s) => ({ ...s, loading: false, error: err.message })); return; }
-
-        // Build client.next_due from sessions
-        const nextDueByClient = {};
-        const allFutureSessions = await supabase.from('pk_hub_sessions')
-          .select('client_id, due_at')
+      const [clientsRes, templatesRes, sessionsRes, prsRes, weekRes, futureRes] = await Promise.all([
+        supabase.from('pk_hub_clients').select('*').order('name'),
+        supabase.from('pk_hub_templates').select('*').order('uses', { ascending: false }),
+        supabase.from('pk_hub_sessions')
+          .select('id, due_at, status, tag, delta_note, client:pk_hub_clients(id, name, status), template:pk_hub_templates(id, name)')
+          .eq('status', 'due')
+          .gte('due_at', startOfDay.toISOString())
+          .lte('due_at', endOfDay.toISOString())
+          .order('due_at'),
+        supabase.from('pk_hub_prs').select('id', { count: 'exact', head: true })
+          .gte('logged_at', startOfDay.toISOString()),
+        supabase.from('pk_hub_sessions').select('id', { count: 'exact', head: true })
+          .eq('status', 'due')
+          .gte('due_at', startOfDay.toISOString())
+          .lte('due_at', endOfWeek.toISOString()),
+        supabase.from('pk_hub_sessions')
+          .select('client_id, due_at, status')
+          .eq('status', 'due')
           .gte('due_at', new Date().toISOString())
-          .order('due_at');
-        if (allFutureSessions.data) {
-          for (const r of allFutureSessions.data) {
-            if (!nextDueByClient[r.client_id]) nextDueByClient[r.client_id] = r.due_at;
-          }
-        }
-        const clients = (clientsRes.data || []).map((c) => ({
-          id: c.id, name: c.name, status: c.status,
-          tag: c.tag, notes: c.notes,
-          last: formatRelative(c.last_seen),
-          next: formatNextDue(nextDueByClient[c.id]),
-        }));
+          .order('due_at'),
+      ]);
 
-        const templates = (templatesRes.data || []).map((t) => ({
-          id: t.id, name: t.name, sets: t.sets,
-          time: `${t.duration_min}m`, uses: t.uses,
-        }));
+      const err = clientsRes.error || templatesRes.error || sessionsRes.error || prsRes.error;
+      if (err) { setState((s) => ({ ...s, loading: false, error: err.message })); return; }
 
-        const sessions = (sessionsRes.data || []).map((s) => ({
-          id: s.id,
-          client: s.client?.name?.replace(/^(\w)\w+\s/, '$1. ') || 'Client',
-          tag: s.tag || s.template?.name || '',
-          due: formatTime(s.due_at),
-          status: s.client?.status || 'mute',
-          delta: s.delta_note || '',
-        }));
-
-        setState({
-          loading: false, error: null,
-          clients, templates, sessions,
-          prCount: prsRes.count || 0,
-        });
-      } catch (e) {
-        if (!cancelled) setState((s) => ({ ...s, loading: false, error: String(e) }));
+      const nextDueByClient = {};
+      for (const r of (futureRes.data || [])) {
+        if (!nextDueByClient[r.client_id]) nextDueByClient[r.client_id] = r.due_at;
       }
-    })();
-    return () => { cancelled = true; };
+
+      const clients = (clientsRes.data || []).map((c) => ({
+        id: c.id, name: c.name, status: c.status,
+        tag: c.tag, notes: c.notes,
+        last: formatRelative(c.last_seen),
+        next: formatNextDue(nextDueByClient[c.id]),
+      }));
+
+      const templates = (templatesRes.data || []).map((t) => ({
+        id: t.id, name: t.name, sets: t.sets,
+        time: `${t.duration_min}m`, uses: t.uses,
+      }));
+
+      const sessions = (sessionsRes.data || []).map((s) => ({
+        id: s.id,
+        client: s.client?.name?.replace(/^(\w)\w+\s/, '$1. ') || 'Client',
+        client_id: s.client?.id,
+        template_id: s.template?.id,
+        tag: s.tag || s.template?.name || '',
+        due: formatTime(s.due_at),
+        status: s.client?.status || 'mute',
+        delta: s.delta_note || '',
+      }));
+
+      setState({
+        loading: false, error: null,
+        clients, templates, sessions,
+        prCount: prsRes.count || 0,
+        weekDue: weekRes.count || 0,
+      });
+    } catch (e) {
+      setState((s) => ({ ...s, loading: false, error: String(e) }));
+    }
+  };
+
+  // Initial fetch + realtime subscription
+  useEffect(() => {
+    fetchAll();
+    const channel = supabase
+      .channel('pk-hub-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_clients' },  fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_sessions' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_prs' },      fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_templates' },fetchAll)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return state;
+  // ── Mutations ────────────────────────────────────────────
+  const markSessionComplete = async (id) => {
+    // Optimistic
+    setState((s) => ({ ...s, sessions: s.sessions.filter((x) => x.id !== id) }));
+    const { error } = await supabase.from('pk_hub_sessions').update({ status: 'complete' }).eq('id', id);
+    if (error) await fetchAll();
+  };
+
+  const addClient = async ({ name, tag, status, notes }) => {
+    const { error } = await supabase.from('pk_hub_clients').insert({
+      name, tag, status: status || 'mute', notes,
+      last_seen: new Date().toISOString(),
+    });
+    if (error) throw error;
+    await fetchAll();
+  };
+
+  const logPR = async ({ client_id, lift, prev_lb, current_lb }) => {
+    const delta = Number(current_lb) - Number(prev_lb);
+    const { error } = await supabase.from('pk_hub_prs').insert({
+      client_id, lift, prev_lb: Number(prev_lb), current_lb: Number(current_lb), delta_lb: delta,
+    });
+    if (error) throw error;
+    await fetchAll();
+  };
+
+  const assignTemplate = async ({ client_id, template_id, due_at }) => {
+    const tpl = state.templates.find((t) => t.id === template_id);
+    const tag = (tpl?.name || '').split(' · ').slice(0, 2).join(' · ');
+    const { error } = await supabase.from('pk_hub_sessions').insert({
+      client_id, template_id,
+      due_at: new Date(due_at).toISOString(),
+      tag, status: 'due',
+    });
+    if (error) throw error;
+    await fetchAll();
+  };
+
+  return { ...state, mutations: { markSessionComplete, addClient, logPR, assignTemplate }, refetch: fetchAll };
 };
 
 const COMMANDS = [
-  { id: 'gen-workout',  label: 'Generate workout for client...', icon: Sparkles, hint: 'AI' },
-  { id: 'open-client',  label: 'Open client view...',            icon: Users,    hint: 'Nav' },
-  { id: 'assign-tmpl',  label: 'Assign template to client...',   icon: Library,  hint: 'Action' },
-  { id: 'new-msg',      label: 'New message...',                 icon: Send,     hint: 'Action' },
+  { id: 'add-client',   label: 'Add new client...',              icon: Plus,     hint: 'Action' },
   { id: 'log-pr',       label: 'Log a PR...',                    icon: Activity, hint: 'Action' },
+  { id: 'assign-tmpl',  label: 'Assign template...',             icon: Library,  hint: 'Action' },
+  { id: 'gen-workout',  label: 'Ask AI to generate a workout',   icon: Sparkles, hint: 'AI' },
   { id: 'settings',     label: 'Open settings',                  icon: Settings, hint: 'Nav' },
 ];
+
+// ─────────────────────────────────────────────────────────
+// MODAL — Liquid Glass overlay primitive
+// ─────────────────────────────────────────────────────────
+const Modal = ({ open, onClose, title, children, width = 520 }) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="pk-pal-overlay" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="pk-glass pk-glass-elev"
+        style={{
+          width: `min(${width}px, 92vw)`, padding: 0,
+          animation: 'pk-rise 220ms cubic-bezier(0.2,0.7,0.2,1) both',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 22px', borderBottom: `1px solid ${TK.hairline}`,
+        }}>
+          <div className="pk-mono" style={{
+            fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+            color: TK.gold, fontWeight: 600,
+          }}>
+            {title}
+          </div>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 'none', color: TK.textMute,
+            cursor: 'pointer', padding: 4, borderRadius: 6,
+            display: 'flex', alignItems: 'center',
+          }}>
+            <X size={14} strokeWidth={2} />
+          </button>
+        </div>
+        <div style={{ padding: 22 }}>{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────
+// FORM PRIMITIVES
+// ─────────────────────────────────────────────────────────
+const Field = ({ label, children }) => (
+  <label style={{ display: 'block', marginBottom: 14 }}>
+    <div className="pk-label" style={{ marginBottom: 6 }}>{label}</div>
+    {children}
+  </label>
+);
+const inputStyle = {
+  width: '100%', padding: '10px 12px', borderRadius: 10,
+  background: 'rgba(0,0,0,0.4)', color: TK.text,
+  border: `1px solid ${TK.hairline}`, outline: 'none',
+  fontSize: 14, fontFamily: 'inherit',
+};
+const Input = (props) => <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
+const Select = ({ children, ...props }) => (
+  <select {...props} style={{ ...inputStyle, ...(props.style || {}) }}>{children}</select>
+);
+const TextArea = (props) => (
+  <textarea {...props} rows={props.rows || 2} style={{ ...inputStyle, resize: 'vertical', ...(props.style || {}) }} />
+);
 
 // ─────────────────────────────────────────────────────────
 // HEADER
@@ -370,9 +497,9 @@ const Hero = ({ stats }) => {
         marginTop: 36, display: 'flex', gap: 36, flexWrap: 'wrap',
         borderTop: `1px solid ${TK.hairline}`, paddingTop: 24,
       }}>
-        <Stat n={pad(stats.sessions)} label="sessions due" />
-        <Stat n={pad(stats.messages)} label="messages" accent />
-        <Stat n={pad(stats.prCount)} label="PR logged" />
+        <Stat n={pad(stats.sessions)} label="due today" />
+        <Stat n={pad(stats.weekDue)} label="this week" accent />
+        <Stat n={pad(stats.prCount)} label="PR today" />
         <Stat n={pad(stats.clients)} label="active clients" />
       </div>
     </section>
@@ -392,10 +519,10 @@ const Stat = ({ n, label, accent }) => (
 // ─────────────────────────────────────────────────────────
 // TODAY GRID — sessions due
 // ─────────────────────────────────────────────────────────
-const TodayGrid = ({ sessions }) => (
+const TodayGrid = ({ sessions, onComplete }) => (
   <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-      <div className="pk-label">DUE TODAY</div>
+      <div className="pk-label">DUE TODAY · {sessions.length}</div>
       <a href="#" className="pk-link pk-mono" style={{
         fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
         display: 'flex', alignItems: 'center', gap: 6,
@@ -406,24 +533,31 @@ const TodayGrid = ({ sessions }) => (
 
     {sessions.length === 0 ? (
       <div className="pk-glass" style={{
-        padding: '32px 24px', textAlign: 'center',
-        color: TK.textMute, fontSize: 13,
+        padding: '40px 24px', textAlign: 'center',
+        color: TK.textDim, fontSize: 14,
       }}>
-        No sessions due today.
+        <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.6 }}>—</div>
+        Day's clear. Good work.
       </div>
     ) : (
       <div style={{
         display: 'grid', gap: 14,
         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
       }}>
-        {sessions.map((s) => <SessionCard key={s.id} s={s} />)}
+        {sessions.map((s) => <SessionCard key={s.id} s={s} onComplete={onComplete} />)}
       </div>
     )}
   </section>
 );
 
-const SessionCard = ({ s }) => {
+const SessionCard = ({ s, onComplete }) => {
   const [hover, setHover] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const handleComplete = async (e) => {
+    e.stopPropagation();
+    setCompleting(true);
+    setTimeout(() => onComplete?.(s.id), 380);
+  };
   return (
     <div
       className="pk-glass"
@@ -432,8 +566,9 @@ const SessionCard = ({ s }) => {
       style={{
         padding: 20, cursor: 'pointer',
         borderColor: hover ? 'rgba(201,169,97,0.30)' : TK.hairline,
-        transform: hover ? 'translateY(-2px)' : 'translateY(0)',
-        transition: 'all 240ms cubic-bezier(0.2,0.7,0.2,1)',
+        transform: completing ? 'scale(0.96)' : (hover ? 'translateY(-2px)' : 'translateY(0)'),
+        opacity: completing ? 0 : 1,
+        transition: 'all 380ms cubic-bezier(0.2,0.7,0.2,1)',
         background: hover ? 'rgba(250,250,250,0.05)' : 'rgba(250,250,250,0.035)',
       }}
     >
@@ -455,10 +590,29 @@ const SessionCard = ({ s }) => {
       </div>
       <div style={{
         marginTop: 18, paddingTop: 14, borderTop: `1px solid ${TK.hairline}`,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
       }}>
-        <span style={{ fontSize: 12, color: TK.textMute }}>{s.delta}</span>
-        <ArrowRight size={14} strokeWidth={2} color={hover ? TK.gold : TK.textMute} />
+        <span style={{ fontSize: 12, color: TK.textMute, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {s.delta}
+        </span>
+        <button
+          onClick={handleComplete}
+          className="pk-mono"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 10px', borderRadius: 8,
+            background: hover ? TK.gold : 'rgba(201,169,97,0.10)',
+            color: hover ? '#000' : TK.gold,
+            border: `1px solid ${hover ? TK.gold : 'rgba(201,169,97,0.25)'}`,
+            cursor: 'pointer',
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            fontFamily: 'Geist Mono, monospace',
+            transition: 'all 200ms ease',
+          }}
+        >
+          <Check size={11} strokeWidth={3} /> COMPLETE
+        </button>
       </div>
     </div>
   );
@@ -467,7 +621,7 @@ const SessionCard = ({ s }) => {
 // ─────────────────────────────────────────────────────────
 // CLIENTS TABLE
 // ─────────────────────────────────────────────────────────
-const ClientsPanel = ({ q, setQ, clients }) => {
+const ClientsPanel = ({ q, setQ, clients, onAddClient }) => {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return clients;
@@ -501,7 +655,7 @@ const ClientsPanel = ({ q, setQ, clients }) => {
           <button className="pk-cta-ghost" style={{ padding: '7px 14px' }}>
             <Filter size={12} strokeWidth={2} /> FILTER
           </button>
-          <button className="pk-cta" style={{ padding: '7px 14px' }}>
+          <button onClick={onAddClient} className="pk-cta" style={{ padding: '7px 14px' }}>
             <Plus size={13} strokeWidth={2.4} /> NEW CLIENT
           </button>
         </div>
@@ -576,7 +730,7 @@ const ClientRow = ({ c, last }) => {
 // ─────────────────────────────────────────────────────────
 // LIBRARY
 // ─────────────────────────────────────────────────────────
-const LibraryPanel = ({ templates }) => (
+const LibraryPanel = ({ templates, onAssign }) => (
   <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
       <div className="pk-label">LIBRARY · TEMPLATES</div>
@@ -588,12 +742,12 @@ const LibraryPanel = ({ templates }) => (
       display: 'grid', gap: 12,
       gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
     }}>
-      {templates.map((t) => <TemplateCard key={t.id} t={t} />)}
+      {templates.map((t) => <TemplateCard key={t.id} t={t} onAssign={onAssign} />)}
     </div>
   </section>
 );
 
-const TemplateCard = ({ t }) => {
+const TemplateCard = ({ t, onAssign }) => {
   const [hover, setHover] = useState(false);
   return (
     <div
@@ -601,7 +755,7 @@ const TemplateCard = ({ t }) => {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding: 18, cursor: 'pointer',
+        padding: 18, position: 'relative',
         borderColor: hover ? 'rgba(201,169,97,0.28)' : TK.hairline,
         transition: 'all 220ms ease',
       }}
@@ -621,6 +775,25 @@ const TemplateCard = ({ t }) => {
         <span>{t.time}</span>
         <span>{t.uses}× used</span>
       </div>
+      <button
+        onClick={() => onAssign?.(t.id)}
+        className="pk-mono"
+        style={{
+          position: 'absolute', top: 12, right: 12,
+          padding: '5px 9px', borderRadius: 7,
+          background: hover ? TK.gold : 'transparent',
+          color: hover ? '#000' : TK.textMute,
+          border: `1px solid ${hover ? TK.gold : 'transparent'}`,
+          cursor: 'pointer',
+          fontSize: 9, fontWeight: 700,
+          letterSpacing: '0.16em', textTransform: 'uppercase',
+          fontFamily: 'Geist Mono, monospace',
+          transition: 'all 200ms ease',
+          opacity: hover ? 1 : 0,
+        }}
+      >
+        ASSIGN
+      </button>
     </div>
   );
 };
@@ -628,19 +801,109 @@ const TemplateCard = ({ t }) => {
 // ─────────────────────────────────────────────────────────
 // AI PANEL
 // ─────────────────────────────────────────────────────────
-const AIPanel = () => {
+// Demo-mode AI: returns a structured response without an API key.
+// Replace with a real LLM call (Edge Function → Anthropic/Gemini) when ready.
+const aiDemoResponse = async (prompt) => {
+  await new Promise((r) => setTimeout(r, 900 + Math.random() * 600));
+  const p = prompt.toLowerCase();
+  if (p.includes('pull') && p.includes('block')) {
+    return [
+      'PULL · 4-WEEK PROGRESSION',
+      '',
+      'Wk 1 · Volume   — 5×8 @ RPE 7   · accessory super-sets',
+      'Wk 2 · Volume   — 5×8 @ RPE 8   · add 1 set of rows',
+      'Wk 3 · Intensity— 5×5 @ RPE 8.5 · drop accessories 20%',
+      'Wk 4 · Test     — 3×3 @ RPE 9.5 · then deload Sat',
+      '',
+      'Anchor lifts: weighted pull-up, pendlay row, RDL.',
+      'Accessory rotation: face pull, hammer curl, rear-delt fly.',
+    ].join('\n');
+  }
+  if (p.includes('plateau') || p.includes('bench')) {
+    return [
+      'BENCH PLATEAU · 3 LIKELY CAUSES',
+      '',
+      '1. Top-end weakness — last 3" lockout failing.',
+      '   → 2× weekly close-grip + board press 1-board.',
+      '',
+      '2. Tricep underload — bench drives shoulder-heavy.',
+      '   → Add JM press OR overhead tri ext, 4×10 RPE 7.',
+      '',
+      '3. Recovery debt — sleep <7h, training 5×.',
+      '   → Drop 1 day, retest in 14 days.',
+    ].join('\n');
+  }
+  if (p.includes('deload')) {
+    return [
+      'DELOAD WEEK · MAINTENANCE',
+      '',
+      'Mon · Push  — 50% top set, 3× across',
+      'Tue · OFF',
+      'Wed · Pull  — 50% top set, 3× across',
+      'Thu · Mobility 24m',
+      'Fri · Legs  — 50% top set, 3× across',
+      'Sat · Walk + sauna',
+      '',
+      'Goal: 60% volume, full ROM, fresh CNS by Monday.',
+    ].join('\n');
+  }
+  if (p.includes('meal') || p.includes('protein')) {
+    return [
+      'MEAL PLAN · 180G PROTEIN · DAIRY-FREE',
+      '',
+      '07:00 · 4 eggs + oats + berries        ─ 38g',
+      '11:00 · Chicken thigh + jasmine rice   ─ 42g',
+      '14:00 · Beef jerky + apple             ─ 22g',
+      '18:00 · Salmon + sweet potato + greens ─ 40g',
+      '21:00 · Whey isolate + almond butter   ─ 38g',
+      '',
+      'Total: 180g. No dairy. ~2,400 kcal.',
+    ].join('\n');
+  }
+  return [
+    'I read the brief. To deliver real output I need an LLM key.',
+    '',
+    'Drop your Anthropic or Gemini key into Settings → AI to',
+    'switch from demo mode to live coach generation.',
+  ].join('\n');
+};
+
+const AIPanel = ({ initialPrompt }) => {
   const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState('');
   const prompts = [
     'Generate a 4-week pull block for J. Kim',
     'Why did M. Rivera plateau on bench?',
     'Build a deload week for D. Santos',
     'Suggest a meal plan for 180g protein, dairy-free',
   ];
+
+  useEffect(() => {
+    if (initialPrompt) setQ(initialPrompt);
+  }, [initialPrompt]);
+
+  const submit = async () => {
+    if (!q.trim() || busy) return;
+    setBusy(true); setOut('');
+    const result = await aiDemoResponse(q);
+    setOut(result);
+    setBusy(false);
+  };
+
   return (
-    <section style={{ padding: '24px 28px 56px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
+    <section id="ai-panel" style={{ padding: '24px 28px 56px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Sparkles size={13} color={TK.gold} strokeWidth={2.4} />
         <div className="pk-label" style={{ color: TK.gold }}>AI · COACH SYSTEM</div>
+        <span className="pk-mono" style={{
+          fontSize: 9, color: TK.textGhost, marginLeft: 4,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          padding: '2px 6px', borderRadius: 4,
+          border: `1px solid ${TK.hairline}`,
+        }}>
+          DEMO MODE
+        </span>
       </div>
       <div className="pk-glass pk-glass-elev" style={{ padding: 22 }}>
         <div style={{
@@ -653,20 +916,53 @@ const AIPanel = () => {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
             placeholder="Ask the system. Generate. Decide."
             style={{
               background: 'transparent', border: 'none', outline: 'none',
               color: TK.text, fontSize: 14, fontFamily: 'inherit', flex: 1,
             }}
           />
-          <CornerDownLeft size={13} color={TK.textMute} strokeWidth={2} />
+          <button
+            onClick={submit}
+            disabled={!q.trim() || busy}
+            className="pk-mono"
+            style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: q.trim() ? TK.gold : 'transparent',
+              color: q.trim() ? '#000' : TK.textMute,
+              border: `1px solid ${q.trim() ? TK.gold : TK.hairline}`,
+              cursor: q.trim() ? 'pointer' : 'default',
+              fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase',
+              transition: 'all 200ms ease',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {busy ? <Loader2 size={11} style={{ animation: 'pk-spin 1s linear infinite' }} /> : <CornerDownLeft size={11} />}
+            RUN
+          </button>
         </div>
+
+        {out && (
+          <pre style={{
+            margin: 0, padding: '16px 18px', borderRadius: 12,
+            background: 'rgba(0,0,0,0.5)', border: `1px solid ${TK.hairline}`,
+            fontFamily: 'Geist Mono, monospace', fontSize: 12, lineHeight: 1.65,
+            color: TK.textDim, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            marginBottom: 16,
+            animation: 'pk-rise 320ms cubic-bezier(0.2,0.7,0.2,1) both',
+          }}>
+            {out}
+          </pre>
+        )}
+
         <div className="pk-label" style={{ marginBottom: 10 }}>SUGGESTED</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {prompts.map((p) => (
             <button
               key={p}
-              onClick={() => setQ(p)}
+              onClick={() => { setQ(p); }}
               className="pk-row-hover"
               style={{
                 padding: '8px 12px', borderRadius: 8,
@@ -686,9 +982,173 @@ const AIPanel = () => {
 };
 
 // ─────────────────────────────────────────────────────────
+// MUTATION MODALS
+// ─────────────────────────────────────────────────────────
+const AddClientModal = ({ open, onClose, onSubmit }) => {
+  const [name, setName] = useState('');
+  const [tag, setTag] = useState('');
+  const [status, setStatus] = useState('mute');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (open) { setName(''); setTag(''); setStatus('mute'); setNotes(''); setErr(''); }
+  }, [open]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) { setErr('Name is required.'); return; }
+    setBusy(true); setErr('');
+    try { await onSubmit({ name: name.trim(), tag: tag.trim(), status, notes: notes.trim() }); onClose(); }
+    catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="ADD CLIENT">
+      <form onSubmit={submit}>
+        <Field label="NAME"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Eli Schwartz" /></Field>
+        <Field label="BLOCK / TAG"><Input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Push · Hypertrophy" /></Field>
+        <Field label="STATUS">
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="mute">Mute · new / quiet</option>
+            <option value="green">Green · on track</option>
+            <option value="gold">Gold · momentum / PR</option>
+            <option value="warn">Warn · needs attention</option>
+          </Select>
+        </Field>
+        <Field label="NOTES"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Returning from knee tweak. Light start." /></Field>
+        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
+          <button type="submit" className="pk-cta" disabled={busy}>
+            {busy ? <><Loader2 size={12} className="pk-spin" style={{ animation: 'pk-spin 1s linear infinite' }} /> SAVING</> : <>SAVE CLIENT</>}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const LogPRModal = ({ open, onClose, onSubmit, clients }) => {
+  const [clientId, setClientId] = useState('');
+  const [lift, setLift] = useState('');
+  const [prev, setPrev] = useState('');
+  const [curr, setCurr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setClientId(clients[0]?.id || '');
+      setLift(''); setPrev(''); setCurr(''); setErr('');
+    }
+  }, [open, clients]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!clientId || !lift.trim() || !prev || !curr) { setErr('All fields are required.'); return; }
+    setBusy(true); setErr('');
+    try { await onSubmit({ client_id: clientId, lift: lift.trim(), prev_lb: prev, current_lb: curr }); onClose(); }
+    catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  };
+
+  const delta = (Number(curr) - Number(prev)) || 0;
+
+  return (
+    <Modal open={open} onClose={onClose} title="LOG A PR">
+      <form onSubmit={submit}>
+        <Field label="CLIENT">
+          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="LIFT"><Input autoFocus value={lift} onChange={(e) => setLift(e.target.value)} placeholder="Overhead Press" /></Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="PREVIOUS (LB)"><Input type="number" value={prev} onChange={(e) => setPrev(e.target.value)} placeholder="140" /></Field>
+          <Field label="NEW (LB)"><Input type="number" value={curr} onChange={(e) => setCurr(e.target.value)} placeholder="145" /></Field>
+        </div>
+        {delta !== 0 && (
+          <div className="pk-mono" style={{
+            padding: '10px 14px', borderRadius: 10,
+            background: delta > 0 ? 'rgba(201,169,97,0.10)' : 'rgba(224,122,108,0.10)',
+            border: `1px solid ${delta > 0 ? 'rgba(201,169,97,0.25)' : 'rgba(224,122,108,0.25)'}`,
+            color: delta > 0 ? TK.gold : TK.danger,
+            fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase',
+            marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <Trophy size={12} strokeWidth={2.4} />
+            {delta > 0 ? '+' : ''}{delta} LB
+          </div>
+        )}
+        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
+          <button type="submit" className="pk-cta" disabled={busy}>{busy ? 'LOGGING…' : 'LOG PR'}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const AssignTemplateModal = ({ open, onClose, onSubmit, clients, templates, prefilledTemplateId }) => {
+  const [clientId, setClientId] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setClientId(clients[0]?.id || '');
+      setTemplateId(prefilledTemplateId || templates[0]?.id || '');
+      // default to today 6 PM in local-ISO format for datetime-local input
+      const d = new Date(); d.setHours(18, 0, 0, 0);
+      const pad = (n) => String(n).padStart(2, '0');
+      setDueAt(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      setErr('');
+    }
+  }, [open, clients, templates, prefilledTemplateId]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!clientId || !templateId || !dueAt) { setErr('All fields are required.'); return; }
+    setBusy(true); setErr('');
+    try { await onSubmit({ client_id: clientId, template_id: templateId, due_at: dueAt }); onClose(); }
+    catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="ASSIGN TEMPLATE">
+      <form onSubmit={submit}>
+        <Field label="CLIENT">
+          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="TEMPLATE">
+          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="DUE"><Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} /></Field>
+        {err && <div style={{ color: TK.danger, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button type="button" onClick={onClose} className="pk-cta-ghost">CANCEL</button>
+          <button type="submit" className="pk-cta" disabled={busy}>{busy ? 'ASSIGNING…' : 'ASSIGN'}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// ─────────────────────────────────────────────────────────
 // COMMAND PALETTE
 // ─────────────────────────────────────────────────────────
-const Palette = ({ open, onClose, clients }) => {
+const Palette = ({ open, onClose, clients, onAction }) => {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
@@ -706,17 +1166,22 @@ const Palette = ({ open, onClose, clients }) => {
     return all.filter(i => i.label.toLowerCase().includes(n) || (i.sub || '').toLowerCase().includes(n));
   }, [q, clients]);
 
+  const choose = (item) => {
+    onAction?.(item);
+    onClose();
+  };
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(items.length - 1, a + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
-      else if (e.key === 'Enter') { e.preventDefault(); onClose(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (items[active]) choose(items[active]); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, items.length, onClose]);
+  }, [open, items, active, onClose]);
 
   if (!open) return null;
   return (
@@ -761,7 +1226,7 @@ const Palette = ({ open, onClose, clients }) => {
               <div
                 key={`${it.kind}-${it.id}`}
                 onMouseEnter={() => setActive(i)}
-                onClick={onClose}
+                onClick={() => choose(it)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '11px 20px', cursor: 'pointer',
@@ -837,7 +1302,9 @@ const Footer = () => (
 export default function Hub() {
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
-  const data = useHubData();
+  const [modal, setModal] = useState(null); // 'add-client' | 'log-pr' | 'assign-tmpl' | { kind: 'assign-tmpl', templateId }
+  const [aiSeed, setAiSeed] = useState('');
+  const data = useHub();
 
   // Cursor spotlight
   useEffect(() => {
@@ -861,9 +1328,22 @@ export default function Hub() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const handleCommand = (item) => {
+    if (item.kind === 'cmd') {
+      if (item.id === 'add-client') setModal('add-client');
+      else if (item.id === 'log-pr') setModal('log-pr');
+      else if (item.id === 'assign-tmpl') setModal({ kind: 'assign-tmpl' });
+      else if (item.id === 'gen-workout') {
+        setAiSeed('Generate a 4-week pull block for J. Kim');
+        setTimeout(() => document.getElementById('ai-panel')?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
+    }
+    // For 'client' kind, future: route to /c/:clientId
+  };
+
   const stats = {
     sessions: data.sessions.length,
-    messages: 2,
+    weekDue: data.weekDue,
     prCount: data.prCount,
     clients: data.clients.length,
   };
@@ -880,15 +1360,50 @@ export default function Hub() {
       {!data.loading && !data.error && (
         <>
           <Hero stats={stats} />
-          <TodayGrid sessions={data.sessions} />
-          <ClientsPanel q={q} setQ={setQ} clients={data.clients} />
-          <LibraryPanel templates={data.templates} />
-          <AIPanel />
+          <TodayGrid
+            sessions={data.sessions}
+            onComplete={data.mutations.markSessionComplete}
+          />
+          <ClientsPanel
+            q={q} setQ={setQ}
+            clients={data.clients}
+            onAddClient={() => setModal('add-client')}
+          />
+          <LibraryPanel
+            templates={data.templates}
+            onAssign={(templateId) => setModal({ kind: 'assign-tmpl', templateId })}
+          />
+          <AIPanel initialPrompt={aiSeed} />
         </>
       )}
 
       <Footer />
-      <Palette open={palette} onClose={() => setPalette(false)} clients={data.clients} />
+
+      <Palette
+        open={palette}
+        onClose={() => setPalette(false)}
+        clients={data.clients}
+        onAction={handleCommand}
+      />
+      <AddClientModal
+        open={modal === 'add-client'}
+        onClose={() => setModal(null)}
+        onSubmit={data.mutations.addClient}
+      />
+      <LogPRModal
+        open={modal === 'log-pr'}
+        onClose={() => setModal(null)}
+        onSubmit={data.mutations.logPR}
+        clients={data.clients}
+      />
+      <AssignTemplateModal
+        open={!!modal && typeof modal === 'object' && modal.kind === 'assign-tmpl'}
+        onClose={() => setModal(null)}
+        onSubmit={data.mutations.assignTemplate}
+        clients={data.clients}
+        templates={data.templates}
+        prefilledTemplateId={typeof modal === 'object' ? modal?.templateId : ''}
+      />
     </div>
   );
 }
