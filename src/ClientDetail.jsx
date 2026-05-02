@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowUpRight, Send, Loader2, Trophy, Activity, MessageSquare,
-  Calendar, Edit3, Check, X,
+  ArrowLeft, Send, Loader2, Trophy, Activity, MessageSquare,
+  Calendar, Edit3, Check, ClipboardCheck, ExternalLink,
 } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 import { useAuth, signOut, SignIn } from './lib/auth.jsx';
@@ -15,8 +15,9 @@ const TK = {
   textGhost: 'rgba(250,250,250,0.22)',
   hairline: 'rgba(250,250,250,0.08)',
   gold: '#C9A961',
-  goldGlow: 'rgba(201,169,97,0.35)',
 };
+
+const CHECKIN_URL = 'https://pkfit-checkin.netlify.app/';
 
 const STYLES = `
   .pk-cd { font-family: 'Geist', -apple-system, sans-serif; background: #000; color: #FAFAFA; min-height: 100vh; }
@@ -66,36 +67,97 @@ const formatRelativeShort = (date) => {
   return `${d}d`;
 };
 
+// Derive PRs from workout_sessions.exercises jsonb (newest-first scan)
+const extractPRs = (sessions) => {
+  const seen = {};
+  const prs = [];
+  for (const s of [...sessions].reverse()) {
+    const list = Array.isArray(s.exercises) ? s.exercises : (s.exercises?.items || []);
+    for (const ex of list) {
+      const name = ex.name || ex.exercise || ex.lift;
+      if (!name) continue;
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      const max = sets.reduce((m, set) => Math.max(m, Number(set.weight || set.lb || set.kg) || 0), 0);
+      if (max > 0 && (!seen[name] || max > seen[name])) {
+        if (seen[name]) {
+          prs.push({
+            id: `${s.id}-${name}`, lift: name,
+            prev_lb: seen[name], current_lb: max,
+            delta_lb: max - seen[name],
+            logged_at: s.performed_at,
+          });
+        }
+        seen[name] = max;
+      }
+    }
+  }
+  return prs.sort((a, b) => new Date(b.logged_at) - new Date(a.logged_at));
+};
+
+// Derive a status dot from last activity
+const deriveStatus = (lastActiveAt) => {
+  if (!lastActiveAt) return 'mute';
+  const days = (Date.now() - new Date(lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (days < 7) return 'green';
+  if (days < 14) return 'warn';
+  return 'mute';
+};
+
 // ─────────────────────────────────────────────────────────
-// Client data hook
+// Data hook
 // ─────────────────────────────────────────────────────────
 const useClient = (id) => {
   const [state, setState] = useState({
     loading: true, error: null,
-    client: null, prs: [], sessions: [], messages: [],
+    client: null, prs: [], sessions: [], messages: [], thread: null, checkIns: [],
   });
 
   const fetchAll = async () => {
     if (!id) return;
-    const [clientRes, prsRes, sessionsRes, messagesRes] = await Promise.all([
-      supabase.from('pk_hub_clients').select('*').eq('id', id).single(),
-      supabase.from('pk_hub_prs').select('*').eq('client_id', id).order('logged_at', { ascending: false }),
-      supabase.from('pk_hub_sessions')
-        .select('*, template:pk_hub_templates(name)')
+    const [clientRes, sessionsRes, threadRes, checkInsRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', id).single(),
+      supabase
+        .from('workout_sessions')
+        .select('*')
         .eq('client_id', id)
-        .order('due_at', { ascending: false }),
-      supabase.from('pk_hub_messages').select('*').eq('client_id', id).order('created_at'),
+        .order('performed_at', { ascending: false }),
+      supabase
+        .from('dm_threads')
+        .select('id, last_activity_at')
+        .eq('client_id', id)
+        .maybeSingle(),
+      supabase
+        .from('check_ins')
+        .select('*')
+        .eq('client_id', id)
+        .order('date', { ascending: false }),
     ]);
+
     if (clientRes.error) {
       setState((s) => ({ ...s, loading: false, error: clientRes.error.message }));
       return;
     }
+
+    let messages = [];
+    if (threadRes.data?.id) {
+      const msgRes = await supabase
+        .from('dm_messages')
+        .select('*')
+        .eq('thread_id', threadRes.data.id)
+        .order('created_at');
+      messages = msgRes.data || [];
+    }
+
+    const sessions = sessionsRes.data || [];
+    const prs = extractPRs(sessions);
+
     setState({
       loading: false, error: null,
       client: clientRes.data,
-      prs: prsRes.data || [],
-      sessions: sessionsRes.data || [],
-      messages: messagesRes.data || [],
+      prs, sessions,
+      messages,
+      thread: threadRes.data,
+      checkIns: checkInsRes.data || [],
     });
   };
 
@@ -103,11 +165,12 @@ const useClient = (id) => {
     fetchAll();
     if (!id) return;
     const channel = supabase
-      .channel(`pk-cd-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_clients', filter: `id=eq.${id}` }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_prs', filter: `client_id=eq.${id}` }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_sessions', filter: `client_id=eq.${id}` }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pk_hub_messages', filter: `client_id=eq.${id}` }, fetchAll)
+      .channel(`pk-client-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${id}` }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workout_sessions', filter: `client_id=eq.${id}` }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_threads', filter: `client_id=eq.${id}` }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dm_messages' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins', filter: `client_id=eq.${id}` }, fetchAll)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
@@ -160,34 +223,41 @@ const Header = ({ name }) => (
 // ─────────────────────────────────────────────────────────
 // HERO
 // ─────────────────────────────────────────────────────────
-const Hero = ({ client, prs, sessions }) => {
-  const completed = sessions.filter((s) => s.status === 'complete').length;
-  const totalPRs = prs.length;
+const Hero = ({ client, prs, sessions, checkIns }) => {
+  const lastActivity = useMemo(() => {
+    const all = [
+      ...sessions.map((s) => s.performed_at),
+      ...checkIns.map((c) => c.created_at),
+    ].filter(Boolean).map((d) => new Date(d).getTime());
+    return all.length ? new Date(Math.max(...all)).toISOString() : null;
+  }, [sessions, checkIns]);
+  const status = deriveStatus(lastActivity);
+
   return (
     <section style={{ padding: '64px 28px 32px', maxWidth: 1080, margin: '0 auto', width: '100%' }}>
       <div className="pk-cd-label" style={{ marginBottom: 18 }}>
-        <span className={`pk-cd-dot pk-cd-dot-${client.status}`} style={{ marginRight: 10 }} />
-        {client.tag}
+        <span className={`pk-cd-dot pk-cd-dot-${status}`} style={{ marginRight: 10 }} />
+        {client.plan || client.loop_stage || 'CLIENT'}
       </div>
       <h1 style={{
         fontSize: 'clamp(48px, 9vw, 120px)',
         fontWeight: 800, lineHeight: 0.95, letterSpacing: '-0.04em',
         margin: 0, color: TK.text,
       }}>
-        {client.name}
+        {client.name || '—'}
       </h1>
-      {client.notes && (
-        <div style={{ fontSize: 16, color: TK.textDim, marginTop: 18, maxWidth: 600, lineHeight: 1.5 }}>
-          {client.notes}
+      {client.email && (
+        <div style={{ fontSize: 14, color: TK.textMute, marginTop: 14, fontFamily: 'Geist Mono, monospace', letterSpacing: '0.04em' }}>
+          {client.email}
         </div>
       )}
       <div style={{
         marginTop: 36, display: 'flex', gap: 36, flexWrap: 'wrap',
         borderTop: `1px solid ${TK.hairline}`, paddingTop: 24,
       }}>
-        <Stat n={String(totalPRs).padStart(2, '0')} label="PRs logged" accent />
-        <Stat n={String(completed).padStart(2, '0')} label="sessions complete" />
-        <Stat n={String(sessions.length).padStart(2, '0')} label="total sessions" />
+        <Stat n={String(prs.length).padStart(2, '0')} label="PRs logged" accent />
+        <Stat n={String(sessions.length).padStart(2, '0')} label="sessions" />
+        <Stat n={String(checkIns.length).padStart(2, '0')} label="check-ins" />
       </div>
     </section>
   );
@@ -207,9 +277,10 @@ const Stat = ({ n, label, accent }) => (
 // TABS
 // ─────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'history',  label: 'HISTORY',  icon: Activity },
-  { id: 'messages', label: 'MESSAGES', icon: MessageSquare },
-  { id: 'notes',    label: 'NOTES',    icon: Edit3 },
+  { id: 'history',  label: 'HISTORY',   icon: Activity },
+  { id: 'checkins', label: 'CHECK-INS', icon: ClipboardCheck },
+  { id: 'messages', label: 'MESSAGES',  icon: MessageSquare },
+  { id: 'notes',    label: 'NOTES',     icon: Edit3 },
 ];
 
 const TabBar = ({ active, onChange, badges }) => (
@@ -217,7 +288,7 @@ const TabBar = ({ active, onChange, badges }) => (
     padding: '0 28px', maxWidth: 1080, margin: '0 auto', width: '100%',
   }}>
     <div className="pk-cd-glass" style={{
-      display: 'inline-flex', padding: 4, borderRadius: 12, gap: 4,
+      display: 'inline-flex', padding: 4, borderRadius: 12, gap: 4, flexWrap: 'wrap',
     }}>
       {TABS.map((t) => {
         const Icon = t.icon;
@@ -235,8 +306,7 @@ const TabBar = ({ active, onChange, badges }) => (
               color: isActive ? TK.gold : TK.textDim,
               fontSize: 11, fontWeight: 600,
               letterSpacing: '0.14em', textTransform: 'uppercase',
-              cursor: 'pointer',
-              transition: 'all 200ms ease',
+              cursor: 'pointer', transition: 'all 200ms ease',
             }}
           >
             <Icon size={11} strokeWidth={2.4} />
@@ -264,7 +334,7 @@ const History = ({ prs, sessions }) => {
   const items = useMemo(() => {
     const all = [
       ...prs.map((p) => ({ kind: 'pr', at: p.logged_at, data: p })),
-      ...sessions.map((s) => ({ kind: 'session', at: s.due_at, data: s })),
+      ...sessions.map((s) => ({ kind: 'session', at: s.performed_at, data: s })),
     ];
     return all.sort((a, b) => new Date(b.at) - new Date(a.at));
   }, [prs, sessions]);
@@ -277,11 +347,9 @@ const History = ({ prs, sessions }) => {
           <div style={{ padding: '48px 24px', textAlign: 'center', color: TK.textMute }}>
             Nothing here yet.
           </div>
-        ) : (
-          items.map((it, i) => (
-            <TimelineRow key={`${it.kind}-${it.data.id}`} item={it} last={i === items.length - 1} />
-          ))
-        )}
+        ) : items.map((it, i) => (
+          <TimelineRow key={`${it.kind}-${it.data.id}`} item={it} last={i === items.length - 1} />
+        ))}
       </div>
     </section>
   );
@@ -289,12 +357,10 @@ const History = ({ prs, sessions }) => {
 
 const TimelineRow = ({ item, last }) => {
   const isPR = item.kind === 'pr';
-  const isFuture = !isPR && new Date(item.at) > new Date();
   const d = item.data;
   return (
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: '24px 90px 1fr auto',
+      display: 'grid', gridTemplateColumns: '24px 90px 1fr auto',
       gap: 16, padding: '16px 20px',
       borderBottom: last ? 'none' : `1px solid ${TK.hairline}`,
       alignItems: 'center',
@@ -302,7 +368,7 @@ const TimelineRow = ({ item, last }) => {
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {isPR
           ? <Trophy size={13} color={TK.gold} strokeWidth={2.2} />
-          : <Calendar size={13} color={isFuture ? TK.textDim : TK.textMute} strokeWidth={2} />}
+          : <Calendar size={13} color={TK.textMute} strokeWidth={2} />}
       </span>
       <span className="pk-cd-mono" style={{ fontSize: 11, color: TK.textMute, letterSpacing: '0.08em' }}>
         {formatDate(item.at)}
@@ -320,14 +386,14 @@ const TimelineRow = ({ item, last }) => {
         ) : (
           <>
             <div style={{ fontSize: 14, fontWeight: 600, color: TK.text, letterSpacing: '-0.01em' }}>
-              {d.tag || d.template?.name || 'Session'}
+              Workout · {d.duration_min ? `${d.duration_min} min` : 'logged'}
+              {d.rpe_avg ? <span style={{ color: TK.textMute, fontWeight: 400 }}> · RPE {d.rpe_avg}</span> : null}
             </div>
-            <div className="pk-cd-mono" style={{
-              fontSize: 11, color: d.status === 'complete' ? 'rgba(108,197,154,0.85)' : TK.textMute,
-              marginTop: 2, letterSpacing: '0.10em', textTransform: 'uppercase',
-            }}>
-              {d.status} · {formatTime(d.due_at)}
-            </div>
+            {d.notes && (
+              <div style={{ fontSize: 12, color: TK.textMute, marginTop: 2 }}>
+                {d.notes}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -342,12 +408,90 @@ const TimelineRow = ({ item, last }) => {
 };
 
 // ─────────────────────────────────────────────────────────
+// CHECK-INS tab
+// ─────────────────────────────────────────────────────────
+const CheckIns = ({ checkIns }) => (
+  <section style={{ padding: '24px 28px', maxWidth: 1080, margin: '0 auto', width: '100%' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div className="pk-cd-label">CHECK-IN HISTORY</div>
+      <button
+        onClick={() => window.open(CHECKIN_URL, '_blank')}
+        className="pk-cd-mono"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '7px 12px', borderRadius: 8,
+          background: 'rgba(250,250,250,0.04)', color: TK.textDim,
+          border: `1px solid ${TK.hairline}`, cursor: 'pointer',
+          fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.16em', textTransform: 'uppercase',
+        }}
+      >
+        REQUEST CHECK-IN
+        <ExternalLink size={11} strokeWidth={2.4} style={{ opacity: 0.7 }} />
+      </button>
+    </div>
+    {checkIns.length === 0 ? (
+      <div className="pk-cd-glass" style={{
+        padding: '48px 24px', textAlign: 'center', color: TK.textMute,
+      }}>
+        No check-ins logged yet.
+      </div>
+    ) : (
+      <div style={{
+        display: 'grid', gap: 12,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      }}>
+        {checkIns.map((c) => <CheckInCard key={c.id} c={c} />)}
+      </div>
+    )}
+  </section>
+);
+
+const CheckInCard = ({ c }) => (
+  <div className="pk-cd-glass" style={{ padding: 18 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+      <div className="pk-cd-mono" style={{ fontSize: 11, color: TK.gold, letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 600 }}>
+        {formatDate(c.date || c.created_at)}
+      </div>
+      <div className="pk-cd-mono" style={{ fontSize: 10, color: TK.textGhost, letterSpacing: '0.10em' }}>
+        {formatRelativeShort(c.created_at)}
+      </div>
+    </div>
+    <div style={{ display: 'flex', gap: 22, marginBottom: c.notes ? 12 : 0 }}>
+      {c.weight != null && (
+        <div>
+          <div className="pk-cd-mono" style={{ fontSize: 22, fontWeight: 600, color: TK.text, letterSpacing: '-0.02em' }}>
+            {c.weight} <span style={{ fontSize: 12, color: TK.textMute, fontWeight: 400 }}>kg</span>
+          </div>
+          <div className="pk-cd-label">WEIGHT</div>
+        </div>
+      )}
+      {c.body_fat != null && (
+        <div>
+          <div className="pk-cd-mono" style={{ fontSize: 22, fontWeight: 600, color: TK.text, letterSpacing: '-0.02em' }}>
+            {c.body_fat} <span style={{ fontSize: 12, color: TK.textMute, fontWeight: 400 }}>%</span>
+          </div>
+          <div className="pk-cd-label">BODY FAT</div>
+        </div>
+      )}
+    </div>
+    {c.notes && (
+      <div style={{
+        fontSize: 13, color: TK.textDim, lineHeight: 1.5,
+        paddingTop: 12, borderTop: `1px solid ${TK.hairline}`, marginTop: 12,
+      }}>
+        {c.notes}
+      </div>
+    )}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────
 // MESSAGES tab
 // ─────────────────────────────────────────────────────────
-const Messages = ({ clientId, clientName, messages, onSend }) => {
+const Messages = ({ clientId, clientName, messages, thread, currentUid, onRefetch }) => {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [asClient, setAsClient] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -359,33 +503,37 @@ const Messages = ({ clientId, clientName, messages, onSend }) => {
     if (!draft.trim() || busy) return;
     setBusy(true);
     try {
-      await onSend({ body: draft.trim(), sender: asClient ? 'client' : 'coach' });
+      // Ensure thread exists
+      let threadId = thread?.id;
+      if (!threadId) {
+        const { data, error } = await supabase
+          .from('dm_threads')
+          .insert({ client_id: clientId, last_activity_at: new Date().toISOString() })
+          .select('id').single();
+        if (error) throw error;
+        threadId = data.id;
+      }
+      const { error: msgError } = await supabase.from('dm_messages').insert({
+        thread_id: threadId,
+        author_id: currentUid,
+        content: draft.trim(),
+        read_by_client: false,
+        read_by_coach: true,
+      });
+      if (msgError) throw msgError;
+      // Update thread activity
+      await supabase.from('dm_threads').update({ last_activity_at: new Date().toISOString() }).eq('id', threadId);
       setDraft('');
+      onRefetch?.();
+    } catch (e) {
+      console.error('Send failed:', e);
     } finally { setBusy(false); }
   };
 
   return (
     <section style={{ padding: '24px 28px', maxWidth: 1080, margin: '0 auto', width: '100%' }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16,
-      }}>
-        <div className="pk-cd-label">THREAD WITH {clientName?.toUpperCase()}</div>
-        <button
-          onClick={() => setAsClient((v) => !v)}
-          className="pk-cd-mono"
-          title="Toggle who sends the next message (demo affordance)"
-          style={{
-            padding: '5px 10px', borderRadius: 6,
-            background: asClient ? 'rgba(201,169,97,0.10)' : 'rgba(250,250,250,0.04)',
-            border: `1px solid ${asClient ? 'rgba(201,169,97,0.25)' : TK.hairline}`,
-            color: asClient ? TK.gold : TK.textMute,
-            fontSize: 9, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            cursor: 'pointer',
-          }}
-        >
-          SEND AS · {asClient ? 'CLIENT' : 'COACH'}
-        </button>
+      <div className="pk-cd-label" style={{ marginBottom: 16 }}>
+        THREAD WITH {clientName?.toUpperCase()}
       </div>
 
       <div className="pk-cd-glass" style={{ display: 'flex', flexDirection: 'column', height: 520 }}>
@@ -401,7 +549,7 @@ const Messages = ({ clientId, clientName, messages, onSend }) => {
             </div>
           )}
           {messages.map((m) => (
-            <MessageBubble key={m.id} m={m} />
+            <MessageBubble key={m.id} m={m} currentUid={currentUid} />
           ))}
         </div>
 
@@ -412,7 +560,7 @@ const Messages = ({ clientId, clientName, messages, onSend }) => {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={asClient ? `Message as ${clientName}…` : 'Reply…'}
+            placeholder="Reply…"
             style={{
               flex: 1, padding: '11px 14px', borderRadius: 10,
               background: 'rgba(0,0,0,0.4)', color: TK.text,
@@ -447,8 +595,8 @@ const Messages = ({ clientId, clientName, messages, onSend }) => {
   );
 };
 
-const MessageBubble = ({ m }) => {
-  const isCoach = m.sender === 'coach';
+const MessageBubble = ({ m, currentUid }) => {
+  const isCoach = m.author_id === currentUid;
   return (
     <div style={{
       display: 'flex',
@@ -464,14 +612,14 @@ const MessageBubble = ({ m }) => {
         border: `1px solid ${isCoach ? 'rgba(201,169,97,0.25)' : TK.hairline}`,
         color: TK.text,
       }}>
-        <div style={{ fontSize: 14, lineHeight: 1.45, letterSpacing: '-0.005em' }}>
-          {m.body}
+        <div style={{ fontSize: 14, lineHeight: 1.45, letterSpacing: '-0.005em', whiteSpace: 'pre-wrap' }}>
+          {m.content}
         </div>
         <div className="pk-cd-mono" style={{
           fontSize: 9, color: TK.textGhost, marginTop: 6,
           letterSpacing: '0.10em', textTransform: 'uppercase',
         }}>
-          {m.sender} · {formatRelativeShort(m.created_at)}
+          {isCoach ? 'COACH' : 'CLIENT'} · {formatRelativeShort(m.created_at)}
         </div>
       </div>
     </div>
@@ -482,12 +630,12 @@ const MessageBubble = ({ m }) => {
 // NOTES tab
 // ─────────────────────────────────────────────────────────
 const Notes = ({ client, onSave }) => {
-  const [notes, setNotes] = useState(client.notes || '');
+  const [notes, setNotes] = useState(client.coach_notes || '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  useEffect(() => { setNotes(client.notes || ''); }, [client.notes]);
+  useEffect(() => { setNotes(client.coach_notes || ''); }, [client.coach_notes]);
 
-  const dirty = notes !== (client.notes || '');
+  const dirty = notes !== (client.coach_notes || '');
 
   const save = async () => {
     if (!dirty || busy) return;
@@ -579,14 +727,8 @@ export default function ClientDetail() {
   }
   if (!auth.session) return <SignIn />;
 
-  const sendMessage = async ({ body, sender }) => {
-    const { error } = await supabase.from('pk_hub_messages').insert({
-      client_id: clientId, sender, body,
-    });
-    if (error) throw error;
-  };
   const saveNotes = async (notes) => {
-    const { error } = await supabase.from('pk_hub_clients').update({ notes }).eq('id', clientId);
+    const { error } = await supabase.from('profiles').update({ coach_notes: notes }).eq('id', clientId);
     if (error) throw error;
   };
 
@@ -630,22 +772,31 @@ export default function ClientDetail() {
 
       {!data.loading && !data.error && data.client && (
         <>
-          <Hero client={data.client} prs={data.prs} sessions={data.sessions} />
+          <Hero
+            client={data.client}
+            prs={data.prs}
+            sessions={data.sessions}
+            checkIns={data.checkIns}
+          />
           <TabBar
             active={tab}
             onChange={setTab}
             badges={{
               history: data.prs.length + data.sessions.length,
+              checkins: data.checkIns.length,
               messages: data.messages.length,
             }}
           />
           {tab === 'history'  && <History prs={data.prs} sessions={data.sessions} />}
+          {tab === 'checkins' && <CheckIns checkIns={data.checkIns} />}
           {tab === 'messages' && (
             <Messages
               clientId={clientId}
               clientName={data.client.name}
               messages={data.messages}
-              onSend={sendMessage}
+              thread={data.thread}
+              currentUid={auth.session.uid}
+              onRefetch={data.refetch}
             />
           )}
           {tab === 'notes' && <Notes client={data.client} onSave={saveNotes} />}
