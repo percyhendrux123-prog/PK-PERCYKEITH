@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search, Command, ArrowUpRight, ArrowRight, Plus, Sparkles,
   Users, Library, Settings, Activity, ChevronRight, Filter,
-  MoreHorizontal, Clock, Send, X, CornerDownLeft, Zap,
+  MoreHorizontal, Clock, Send, X, CornerDownLeft, Zap, Loader2,
 } from 'lucide-react';
+import { supabase } from './lib/supabase.js';
 
 // ─────────────────────────────────────────────────────────
 // PKFIT · IDENTITY ARCHITECT · PERCY KEITH
@@ -152,38 +153,121 @@ const STYLES = `
 // ─────────────────────────────────────────────────────────
 // MOCK DATA
 // ─────────────────────────────────────────────────────────
-const NOW = { weekday: 'TUE', date: '02 MAY', time: '10:51' };
 const COACH = { initials: 'PK', name: 'Percy Keith' };
 
-const SESSIONS_DUE = [
-  { id: 1, client: 'M. Rivera', tag: 'Push · Hypertrophy', due: '06:00 PM', status: 'gold', delta: '+5 lb bench last' },
-  { id: 2, client: 'J. Kim', tag: 'Pull · Volume', due: '07:30 PM', status: 'green', delta: 'Hit RPE 8 across' },
-  { id: 3, client: 'P. Shah', tag: 'Mobility · Recovery', due: '08:00 PM', status: 'mute', delta: 'New block · day 1' },
-];
+// ─────────────────────────────────────────────────────────
+// FORMATTERS
+// ─────────────────────────────────────────────────────────
+const formatTime = (date) => {
+  const d = new Date(date);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h + 11) % 12) + 1;
+  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+const formatRelative = (date) => {
+  if (!date) return '—';
+  const ms = Date.now() - new Date(date).getTime();
+  const h = Math.floor(ms / (1000 * 60 * 60));
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+};
+const formatNextDue = (date) => {
+  if (!date) return '—';
+  const d = new Date(date);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return formatTime(d);
+  const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${day} ${formatTime(d)}`;
+};
+const formatNow = () => {
+  const d = new Date();
+  return {
+    weekday: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+    date: d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }).toUpperCase(),
+    time: d.toTimeString().slice(0, 5),
+  };
+};
 
-const CLIENTS = [
-  { id: 1, name: 'Maria Rivera',     status: 'gold',  next: '06:00 PM',  last: '12h ago',   tag: 'Push · Hypertrophy', notes: '+5 lb OHP last Friday' },
-  { id: 2, name: 'Jordan Kim',       status: 'green', next: '07:30 PM',  last: '1d ago',    tag: 'Pull · Volume',      notes: 'Wants to add a 4th day' },
-  { id: 3, name: 'Priya Shah',       status: 'mute',  next: '08:00 PM',  last: '2d ago',    tag: 'Mobility',           notes: 'Returning from knee tweak' },
-  { id: 4, name: 'Diego Santos',     status: 'green', next: 'Wed 6:30',  last: '3h ago',    tag: 'Legs · Heavy',       notes: '12-week peak phase' },
-  { id: 5, name: 'Aisha Mensah',     status: 'warn',  next: 'Wed 7:00',  last: '5d ago',    tag: 'Full body',          notes: 'Slipping on check-ins' },
-  { id: 6, name: 'Liam O\'Connor',   status: 'green', next: 'Thu 5:30',  last: '6h ago',    tag: 'Push · Strength',    notes: 'Form video pending review' },
-  { id: 7, name: 'Sana Patel',       status: 'mute',  next: 'Thu 8:00',  last: '4d ago',    tag: 'Hybrid · Run',       notes: 'Marathon block week 3' },
-  { id: 8, name: 'Marcus Webb',      status: 'green', next: 'Fri 6:00',  last: '8h ago',    tag: 'Pull · Heavy',       notes: 'Deload next week' },
-  { id: 9, name: 'Eli Schwartz',     status: 'gold',  next: 'Fri 7:30',  last: '2h ago',    tag: 'Legs · Volume',      notes: 'Squat PR target Sat' },
-  { id: 10, name: 'Naomi Carter',    status: 'warn',  next: 'Sat 10:00', last: '7d ago',    tag: 'Full body',          notes: 'Needs re-engagement DM' },
-  { id: 11, name: 'Tobi Adebayo',    status: 'green', next: 'Sat 11:30', last: '1d ago',    tag: 'Push · Hyp.',        notes: 'Feeling strong this block' },
-  { id: 12, name: 'Hana Watanabe',   status: 'mute',  next: 'Sun 9:00',  last: '3d ago',    tag: 'Mobility',           notes: 'Light week — travel' },
-];
+// ─────────────────────────────────────────────────────────
+// DATA HOOK — pulls live from Supabase pk_hub_* tables
+// ─────────────────────────────────────────────────────────
+const useHubData = () => {
+  const [state, setState] = useState({ loading: true, error: null, clients: [], templates: [], sessions: [], prCount: 0 });
 
-const LIBRARY_TEMPLATES = [
-  { id: 1, name: 'PUSH · HYPERTROPHY · A',   sets: 24, time: '72m', uses: 38 },
-  { id: 2, name: 'PULL · VOLUME · A',        sets: 22, time: '65m', uses: 41 },
-  { id: 3, name: 'LEGS · HEAVY · A',         sets: 20, time: '78m', uses: 29 },
-  { id: 4, name: 'MOBILITY · 24',            sets: 12, time: '24m', uses: 52 },
-  { id: 5, name: 'PUSH · STRENGTH · A',      sets: 18, time: '60m', uses: 22 },
-  { id: 6, name: 'FULL BODY · 45',           sets: 14, time: '45m', uses: 17 },
-];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();   endOfDay.setHours(23, 59, 59, 999);
+
+        const [clientsRes, templatesRes, sessionsRes, prsRes] = await Promise.all([
+          supabase.from('pk_hub_clients').select('*').order('name'),
+          supabase.from('pk_hub_templates').select('*').order('uses', { ascending: false }),
+          supabase.from('pk_hub_sessions')
+            .select('id, due_at, status, tag, delta_note, client:pk_hub_clients(id, name, status), template:pk_hub_templates(id, name)')
+            .gte('due_at', startOfDay.toISOString())
+            .lte('due_at', endOfDay.toISOString())
+            .order('due_at'),
+          supabase.from('pk_hub_prs').select('id', { count: 'exact', head: true })
+            .gte('logged_at', startOfDay.toISOString()),
+        ]);
+
+        if (cancelled) return;
+        const err = clientsRes.error || templatesRes.error || sessionsRes.error || prsRes.error;
+        if (err) { setState((s) => ({ ...s, loading: false, error: err.message })); return; }
+
+        // Build client.next_due from sessions
+        const nextDueByClient = {};
+        const allFutureSessions = await supabase.from('pk_hub_sessions')
+          .select('client_id, due_at')
+          .gte('due_at', new Date().toISOString())
+          .order('due_at');
+        if (allFutureSessions.data) {
+          for (const r of allFutureSessions.data) {
+            if (!nextDueByClient[r.client_id]) nextDueByClient[r.client_id] = r.due_at;
+          }
+        }
+        const clients = (clientsRes.data || []).map((c) => ({
+          id: c.id, name: c.name, status: c.status,
+          tag: c.tag, notes: c.notes,
+          last: formatRelative(c.last_seen),
+          next: formatNextDue(nextDueByClient[c.id]),
+        }));
+
+        const templates = (templatesRes.data || []).map((t) => ({
+          id: t.id, name: t.name, sets: t.sets,
+          time: `${t.duration_min}m`, uses: t.uses,
+        }));
+
+        const sessions = (sessionsRes.data || []).map((s) => ({
+          id: s.id,
+          client: s.client?.name?.replace(/^(\w)\w+\s/, '$1. ') || 'Client',
+          tag: s.tag || s.template?.name || '',
+          due: formatTime(s.due_at),
+          status: s.client?.status || 'mute',
+          delta: s.delta_note || '',
+        }));
+
+        setState({
+          loading: false, error: null,
+          clients, templates, sessions,
+          prCount: prsRes.count || 0,
+        });
+      } catch (e) {
+        if (!cancelled) setState((s) => ({ ...s, loading: false, error: String(e) }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return state;
+};
 
 const COMMANDS = [
   { id: 'gen-workout',  label: 'Generate workout for client...', icon: Sparkles, hint: 'AI' },
@@ -257,39 +341,43 @@ const Header = ({ onCmd }) => (
 // ─────────────────────────────────────────────────────────
 // HERO — "WHAT'S NEXT?"
 // ─────────────────────────────────────────────────────────
-const Hero = () => (
-  <section style={{ padding: '64px 28px 32px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-      marginBottom: 28, flexWrap: 'wrap', gap: 12,
-    }}>
-      <div className="pk-label">TODAY · OPERATOR'S CONSOLE</div>
-      <div className="pk-mono" style={{
-        fontSize: 12, color: TK.textDim, letterSpacing: '0.10em',
+const Hero = ({ stats }) => {
+  const NOW = useMemo(() => formatNow(), []);
+  const pad = (n) => String(n).padStart(2, '0');
+  return (
+    <section style={{ padding: '64px 28px 32px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 28, flexWrap: 'wrap', gap: 12,
       }}>
-        {NOW.weekday} · {NOW.date} · {NOW.time}
+        <div className="pk-label">TODAY · OPERATOR'S CONSOLE</div>
+        <div className="pk-mono" style={{
+          fontSize: 12, color: TK.textDim, letterSpacing: '0.10em',
+        }}>
+          {NOW.weekday} · {NOW.date} · {NOW.time}
+        </div>
       </div>
-    </div>
 
-    <h1 className="pk-display" style={{
-      fontSize: 'clamp(64px, 11vw, 168px)',
-      margin: 0, color: TK.text,
-    }}>
-      what's<br />
-      <span style={{ color: TK.gold }}>next?</span>
-    </h1>
+      <h1 className="pk-display" style={{
+        fontSize: 'clamp(64px, 11vw, 168px)',
+        margin: 0, color: TK.text,
+      }}>
+        what's<br />
+        <span style={{ color: TK.gold }}>next?</span>
+      </h1>
 
-    <div style={{
-      marginTop: 36, display: 'flex', gap: 36, flexWrap: 'wrap',
-      borderTop: `1px solid ${TK.hairline}`, paddingTop: 24,
-    }}>
-      <Stat n="03" label="sessions due" />
-      <Stat n="02" label="messages" accent />
-      <Stat n="01" label="PR logged" />
-      <Stat n="12" label="active clients" />
-    </div>
-  </section>
-);
+      <div style={{
+        marginTop: 36, display: 'flex', gap: 36, flexWrap: 'wrap',
+        borderTop: `1px solid ${TK.hairline}`, paddingTop: 24,
+      }}>
+        <Stat n={pad(stats.sessions)} label="sessions due" />
+        <Stat n={pad(stats.messages)} label="messages" accent />
+        <Stat n={pad(stats.prCount)} label="PR logged" />
+        <Stat n={pad(stats.clients)} label="active clients" />
+      </div>
+    </section>
+  );
+};
 
 const Stat = ({ n, label, accent }) => (
   <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
@@ -304,7 +392,7 @@ const Stat = ({ n, label, accent }) => (
 // ─────────────────────────────────────────────────────────
 // TODAY GRID — sessions due
 // ─────────────────────────────────────────────────────────
-const TodayGrid = () => (
+const TodayGrid = ({ sessions }) => (
   <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
       <div className="pk-label">DUE TODAY</div>
@@ -316,14 +404,21 @@ const TodayGrid = () => (
       </a>
     </div>
 
-    <div style={{
-      display: 'grid', gap: 14,
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    }}>
-      {SESSIONS_DUE.map((s) => (
-        <SessionCard key={s.id} s={s} />
-      ))}
-    </div>
+    {sessions.length === 0 ? (
+      <div className="pk-glass" style={{
+        padding: '32px 24px', textAlign: 'center',
+        color: TK.textMute, fontSize: 13,
+      }}>
+        No sessions due today.
+      </div>
+    ) : (
+      <div style={{
+        display: 'grid', gap: 14,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      }}>
+        {sessions.map((s) => <SessionCard key={s.id} s={s} />)}
+      </div>
+    )}
   </section>
 );
 
@@ -372,12 +467,12 @@ const SessionCard = ({ s }) => {
 // ─────────────────────────────────────────────────────────
 // CLIENTS TABLE
 // ─────────────────────────────────────────────────────────
-const ClientsPanel = ({ q, setQ }) => {
+const ClientsPanel = ({ q, setQ, clients }) => {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return CLIENTS;
-    return CLIENTS.filter(c => c.name.toLowerCase().includes(needle) || c.tag.toLowerCase().includes(needle));
-  }, [q]);
+    if (!needle) return clients;
+    return clients.filter(c => c.name.toLowerCase().includes(needle) || (c.tag || '').toLowerCase().includes(needle));
+  }, [q, clients]);
 
   return (
     <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
@@ -385,7 +480,7 @@ const ClientsPanel = ({ q, setQ }) => {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 16, flexWrap: 'wrap', gap: 12,
       }}>
-        <div className="pk-label">CLIENTS · {CLIENTS.length}</div>
+        <div className="pk-label">CLIENTS · {clients.length}</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <div className="pk-glass" style={{
             display: 'flex', alignItems: 'center', gap: 8,
@@ -481,7 +576,7 @@ const ClientRow = ({ c, last }) => {
 // ─────────────────────────────────────────────────────────
 // LIBRARY
 // ─────────────────────────────────────────────────────────
-const LibraryPanel = () => (
+const LibraryPanel = ({ templates }) => (
   <section style={{ padding: '24px 28px', maxWidth: 1320, margin: '0 auto', width: '100%' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
       <div className="pk-label">LIBRARY · TEMPLATES</div>
@@ -493,7 +588,7 @@ const LibraryPanel = () => (
       display: 'grid', gap: 12,
       gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
     }}>
-      {LIBRARY_TEMPLATES.map((t) => <TemplateCard key={t.id} t={t} />)}
+      {templates.map((t) => <TemplateCard key={t.id} t={t} />)}
     </div>
   </section>
 );
@@ -593,7 +688,7 @@ const AIPanel = () => {
 // ─────────────────────────────────────────────────────────
 // COMMAND PALETTE
 // ─────────────────────────────────────────────────────────
-const Palette = ({ open, onClose }) => {
+const Palette = ({ open, onClose, clients }) => {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
@@ -604,12 +699,12 @@ const Palette = ({ open, onClose }) => {
 
   const items = useMemo(() => {
     const cmds = COMMANDS.map(c => ({ kind: 'cmd', ...c }));
-    const cls = CLIENTS.slice(0, 5).map(c => ({ kind: 'client', id: c.id, label: c.name, sub: c.tag, icon: Users }));
+    const cls = clients.slice(0, 5).map(c => ({ kind: 'client', id: c.id, label: c.name, sub: c.tag, icon: Users }));
     const all = [...cmds, ...cls];
     if (!q.trim()) return all;
     const n = q.trim().toLowerCase();
     return all.filter(i => i.label.toLowerCase().includes(n) || (i.sub || '').toLowerCase().includes(n));
-  }, [q]);
+  }, [q, clients]);
 
   useEffect(() => {
     if (!open) return;
@@ -742,6 +837,7 @@ const Footer = () => (
 export default function Hub() {
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
+  const data = useHubData();
 
   // Cursor spotlight
   useEffect(() => {
@@ -765,18 +861,68 @@ export default function Hub() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const stats = {
+    sessions: data.sessions.length,
+    messages: 2,
+    prCount: data.prCount,
+    clients: data.clients.length,
+  };
+
   return (
     <div className="pk-hub pk-grain">
       <style>{STYLES}</style>
       <div className="pk-spot" />
       <Header onCmd={() => setPalette(true)} />
-      <Hero />
-      <TodayGrid />
-      <ClientsPanel q={q} setQ={setQ} />
-      <LibraryPanel />
-      <AIPanel />
+
+      {data.loading && <LoadingState />}
+      {data.error && <ErrorState message={data.error} />}
+
+      {!data.loading && !data.error && (
+        <>
+          <Hero stats={stats} />
+          <TodayGrid sessions={data.sessions} />
+          <ClientsPanel q={q} setQ={setQ} clients={data.clients} />
+          <LibraryPanel templates={data.templates} />
+          <AIPanel />
+        </>
+      )}
+
       <Footer />
-      <Palette open={palette} onClose={() => setPalette(false)} />
+      <Palette open={palette} onClose={() => setPalette(false)} clients={data.clients} />
     </div>
   );
 }
+
+const LoadingState = () => (
+  <div style={{
+    minHeight: '60vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 18,
+    color: 'rgba(250,250,250,0.40)',
+  }}>
+    <Loader2 size={20} className="pk-spin" style={{ animation: 'pk-spin 1s linear infinite' }} strokeWidth={2} />
+    <div className="pk-mono" style={{
+      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+    }}>
+      LOADING · OPERATOR'S CONSOLE
+    </div>
+    <style>{`@keyframes pk-spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
+const ErrorState = ({ message }) => (
+  <div style={{
+    minHeight: '60vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 14,
+    padding: 28, textAlign: 'center',
+  }}>
+    <div className="pk-mono" style={{
+      fontSize: 11, letterSpacing: '0.20em', textTransform: 'uppercase',
+      color: 'rgba(224,122,108,0.85)',
+    }}>
+      CONNECTION ERROR
+    </div>
+    <div style={{ fontSize: 13, color: 'rgba(250,250,250,0.62)', maxWidth: 480 }}>
+      {message}
+    </div>
+  </div>
+);
