@@ -732,7 +732,7 @@ const CTA = () => {
           display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap',
         }}>
           <button
-            onClick={() => window.open('https://pkfit.app', '_blank')}
+            onClick={() => window.open('https://pkfit-intake.netlify.app', '_blank')}
             style={{
               padding: '16px 28px', borderRadius: 14,
               background: T.text, color: T.bg, border: 'none',
@@ -785,10 +785,10 @@ const CTA = () => {
             pkfit · 2026
           </div>
           <a
-            href="https://pkfit.app"
+            href="https://pkfit-intake.netlify.app"
             style={{ color: T.textMute, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            pkfit.app <ExternalLink size={11} />
+            pkfit · intake <ExternalLink size={11} />
           </a>
         </div>
       </div>
@@ -815,7 +815,7 @@ export default function PKfitShare() {
 
       <Header
         scrollY={scrollY}
-        onCTA={() => window.open('https://pkfit.app', '_blank')}
+        onCTA={() => window.open('https://pkfit-intake.netlify.app', '_blank')}
       />
 
       <Hero scrollY={scrollY} />
