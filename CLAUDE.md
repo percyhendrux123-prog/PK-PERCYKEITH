@@ -21,6 +21,17 @@ when he's ready. Match that energy: bias to action, show the work, don't over-as
 - `TODO(percy)`: current numbers — active clients, monthly revenue, price points, retention
 - `TODO(percy)`: your kids' names/ages (only if you want them here — helps me keep the "why" in view)
 
+## Session start (do this first)
+
+Re-ground from the private source of truth before diving in:
+
+1. **If Notion is connected, read the PKFIT — AI Collaboration Hub** and its locked specs
+   (slide aesthetic, content architecture, anchor templates) for current canon. **Notion is
+   the live source of truth.** This repo holds only public-safe scaffolding.
+2. **Keep sensitive context out of git** — pricing, funnel specifics, client or personal
+   details, revenue, payment links stay in-session only. **This repo is public.**
+3. Then surface anything urgent and ask Percy what we're driving today.
+
 ## What this command center is
 
 A single place where one consistent mind helps Percy:
