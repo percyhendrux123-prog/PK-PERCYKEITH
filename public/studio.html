@@ -385,6 +385,36 @@
   .ig-copy li{display:flex;gap:13px;font-size:15px;color:#C4BCAD}
   .ig-copy li svg{width:19px;height:19px;color:var(--gold);flex:none;margin-top:2px}
 
+  /* ---------- work rail ---------- */
+  .work{padding:clamp(80px,12vh,140px) 0;overflow:hidden}
+  .work-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  .work-nav{display:flex;gap:10px}
+  .work-nav button{width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--gold);cursor:pointer;display:grid;place-items:center;transition:background .3s,border-color .3s,transform .3s var(--ease),opacity .3s}
+  .work-nav button:hover{background:rgba(201,168,118,.1);border-color:var(--gold);transform:translateY(-2px)}
+  .work-nav button:disabled{opacity:.3;cursor:default;transform:none}
+  .work-nav svg{width:20px;height:20px}
+  .rail{display:flex;gap:24px;margin-top:48px;padding:6px 0 26px;padding-left:max(20px,calc((100vw - min(1180px,92vw))/2));padding-right:24px;overflow-x:auto;scroll-snap-type:x mandatory;cursor:grab;scrollbar-width:none;-webkit-overflow-scrolling:touch;outline:none}
+  .rail::-webkit-scrollbar{display:none}
+  .rail:focus-visible{outline:2px solid var(--gold-hi);outline-offset:-2px}
+  .rail.drag{cursor:grabbing;scroll-snap-type:none}
+  .rail.drag a{pointer-events:none}
+  .card{flex:0 0 min(86vw,548px);scroll-snap-align:start;position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line-dim);background:#111114;transition:transform .5s var(--ease),border-color .5s}
+  .card:hover{transform:translateY(-6px);border-color:var(--line)}
+  .card-img{position:relative;aspect-ratio:16/10;overflow:hidden;background:#0c0c0d}
+  .card-img img{width:100%;height:100%;object-fit:cover;object-position:top center;transition:transform .9s var(--ease)}
+  .card:hover .card-img img{transform:scale(1.045)}
+  .card-tag{position:absolute;top:14px;left:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-hi);background:rgba(10,10,11,.62);backdrop-filter:blur(8px);border:1px solid var(--line);padding:6px 11px;border-radius:100px}
+  .card-body{padding:24px 24px 26px;display:flex;flex-direction:column;gap:11px}
+  .card-body h3{font-family:var(--serif);font-weight:400;font-size:clamp(22px,2.4vw,28px);letter-spacing:-.01em}
+  .card-body p{font-size:14.5px;color:#A9A294;line-height:1.55}
+  .card-meta{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:8px;padding-top:16px;border-top:1px solid var(--line-dim)}
+  .card-tags{font-family:var(--mono);font-size:11px;color:#8f897b;letter-spacing:.03em}
+  .card-link{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--gold);white-space:nowrap}
+  .card-link svg{width:15px;height:15px;transition:transform .3s var(--ease)}
+  .card:hover .card-link svg{transform:translate(3px,-3px)}
+  .rail-hint{margin-top:20px;padding-left:max(20px,calc((100vw - min(1180px,92vw))/2));font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#8f897b;display:flex;align-items:center;gap:10px}
+  .rail-hint::before{content:"";width:30px;height:1px;background:var(--gold)}
+
   /* ---------- kinetic statement band ---------- */
   .statement{position:relative;z-index:1;overflow:hidden;padding:clamp(40px,7vh,82px) 0;border-block:1px solid var(--line-dim);background:linear-gradient(180deg,#0c0c0e,#070708)}
   .stmt-skew{will-change:transform}
@@ -425,6 +455,7 @@
 <nav id="nav">
   <a class="brand" href="#top" aria-label="PKVISION home"><span class="mono-badge">PK</span><span class="brand-word">VISION</span></a>
   <div class="nav-links">
+    <a href="#work">Work</a>
     <a href="#services">Services</a>
     <a href="#styles">Styles</a>
     <a href="#process">Process</a>
@@ -550,6 +581,59 @@
   </div>
 </section>
 
+<!-- selected work rail -->
+<section class="work" id="work">
+  <div class="wrap work-head">
+    <div>
+      <div class="kicker fx">Selected work</div>
+      <h2 class="section-title fx d1">Real builds. <em>Live</em> links.</h2>
+    </div>
+    <div class="work-nav fx d2">
+      <button type="button" data-dir="-1" aria-label="Previous project"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button type="button" data-dir="1" aria-label="Next project"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+  </div>
+  <div class="rail fx" id="rail" tabindex="0" role="list" aria-label="Selected work, scrollable">
+    <article class="card" role="listitem">
+      <div class="card-img"><span class="card-tag">Live web app</span>
+        <img src="/work/proj-pkfit.jpg" loading="lazy" alt="PKFIT DPL Diagnostic — a bold black and gold landing page reading 'You don't have a discipline problem. You have a paralysis loop.'" /></div>
+      <div class="card-body">
+        <h3>PKFIT — DPL Diagnostic</h3>
+        <p>An interactive 8-question diagnostic that pinpoints where a client's discipline collapses, then prescribes the next standard. Built end to end.</p>
+        <div class="card-meta">
+          <span class="card-tags">Web app · Quiz logic · Brand</span>
+          <a class="card-link" href="https://pkfit-dpl-v2.netlify.app/" target="_blank" rel="noopener">Visit live <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></a>
+        </div>
+      </div>
+    </article>
+    <article class="card" role="listitem">
+      <div class="card-img"><span class="card-tag">This site</span>
+        <img src="/work/proj-pkvision.jpg" loading="lazy" alt="The PKVISION studio landing page with a large serif headline 'Websites and apps, engineered to win customers.'" /></div>
+      <div class="card-body">
+        <h3>PKVISION</h3>
+        <p>The page you're on. A studio site that proves the work by being the work — live particle motion, a real-time style switcher, and a custom type system.</p>
+        <div class="card-meta">
+          <span class="card-tags">Web · Brand · Motion</span>
+          <a class="card-link" href="#top">You're on it <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>
+        </div>
+      </div>
+    </article>
+    <article class="card" role="listitem">
+      <div class="card-img"><span class="card-tag">Scrollytelling</span>
+        <img src="/work/proj-share.jpg" loading="lazy" alt="The pkfit training-week share page, a scroll-driven experience on a dark background." /></div>
+      <div class="card-body">
+        <h3>pkfit — Training Week</h3>
+        <p>A scroll-driven share experience that turns one training week into a cinematic story — stat morphs, a PR moment, and a coach's note, hour by hour.</p>
+        <div class="card-meta">
+          <span class="card-tags">Scrollytelling · Motion</span>
+          <a class="card-link" href="/" target="_blank" rel="noopener">Visit live <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></a>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div class="rail-hint">Drag &middot; scroll &middot; or use the arrows</div>
+</section>
+
 <!-- style picker -->
 <section class="pad wrap" id="styles">
   <div class="kicker fx">Your brand, your vibe</div>
@@ -634,7 +718,7 @@
 </section>
 
 <!-- principles -->
-<section class="pad wrap" id="work">
+<section class="pad wrap" id="approach">
   <div class="kicker fx">How I work</div>
   <h2 class="section-title fx d1">Standards I <em>don't move on.</em></h2>
   <div class="stats fx d2" style="margin-top:56px" id="stats">
@@ -1059,6 +1143,32 @@
       });
     }
     paint('editorial');
+  })();
+
+  // work rail — drag, wheel, arrows, keyboard
+  (function(){
+    var rail = document.getElementById('rail');
+    if(!rail) return;
+    var btns = document.querySelectorAll('.work-nav button');
+    var down = false, startX = 0, startL = 0, moved = false;
+    rail.addEventListener('pointerdown', function(e){
+      down = true; moved = false; startX = e.clientX; startL = rail.scrollLeft;
+      rail.classList.add('drag'); try{ rail.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    rail.addEventListener('pointermove', function(e){
+      if(!down) return; var dx = e.clientX - startX; if(Math.abs(dx) > 4) moved = true; rail.scrollLeft = startL - dx;
+    });
+    function endDrag(){ if(down){ down = false; rail.classList.remove('drag'); } }
+    rail.addEventListener('pointerup', endDrag); rail.addEventListener('pointercancel', endDrag);
+    rail.addEventListener('click', function(e){ if(moved){ e.preventDefault(); e.stopPropagation(); } }, true);
+    rail.addEventListener('wheel', function(e){
+      if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){ rail.scrollLeft += e.deltaY; e.preventDefault(); }
+    }, { passive: false });
+    function step(){ var c = rail.querySelector('.card'); return c ? c.getBoundingClientRect().width + 24 : 400; }
+    btns.forEach(function(bn){ bn.addEventListener('click', function(){ rail.scrollBy({ left: step() * parseInt(bn.getAttribute('data-dir'),10), behavior: 'smooth' }); }); });
+    function update(){ var max = rail.scrollWidth - rail.clientWidth - 2; if(btns[0]) btns[0].disabled = rail.scrollLeft <= 2; if(btns[1]) btns[1].disabled = rail.scrollLeft >= max; }
+    rail.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update); update();
   })();
 
   // kinetic statement band — skew to scroll velocity
