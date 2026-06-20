@@ -807,14 +807,14 @@
         if(p < 1) requestAnimationFrame(tick);
       })(start);
     }
-    var started = false, current = 0;
+    // Real profile numbers — update these three to match @officialpercyk.
+    var IG = { posts: 87, followers: 12400, following: 312 };
+    var started = false;
     function start(){
       if(started) return; started = true;
-      var base = 12400;
-      countTo(posts, 87, 1000);
-      countTo(fwg, 312, 1100);
-      countTo(fol, base, 1600, fmt);
-      current = base;
+      countTo(posts, IG.posts, 1000);
+      countTo(fwg, IG.following, 1100);
+      countTo(fol, IG.followers, 1600, fmt);   // counts up once, then holds
       if(line && !rm){
         var len = line.getTotalLength();
         line.style.strokeDasharray = len;
@@ -823,16 +823,7 @@
         line.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(.22,1,.36,1)';
         line.style.strokeDashoffset = '0';
       }
-      if(area && !rm){ area.style.transition = 'opacity 1.2s ease .5s'; area.style.opacity = '1'; }
-      else if(area){ area.style.opacity = '1'; }
-      if(!rm){
-        setTimeout(function(){
-          setInterval(function(){
-            current += Math.floor(Math.random()*7) + 1;
-            fol.textContent = fmt(current);
-          }, 2600);
-        }, 1800);
-      }
+      if(area){ area.style.transition = rm ? 'none' : 'opacity 1.2s ease .5s'; area.style.opacity = '1'; }
     }
     var obs = new IntersectionObserver(function(es){
       es.forEach(function(e){ if(e.isIntersecting){ start(); obs.disconnect(); } });
