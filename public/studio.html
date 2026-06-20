@@ -24,7 +24,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Space+Grotesk:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=DM+Serif+Display:ital@0;1&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Space+Grotesk:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
 
 <style>
   :root{
@@ -279,6 +279,58 @@
   .stage.touched .stage-hint{opacity:0}
   @media(max-width:600px){.float{font-size:10px;padding:7px 11px}.f3{display:none}}
 
+  /* ---------- style picker ---------- */
+  .styles-wrap{display:grid;grid-template-columns:340px 1fr;gap:clamp(24px,4vw,52px);margin-top:54px;align-items:start}
+  @media(max-width:880px){.styles-wrap{grid-template-columns:1fr;gap:30px}}
+  .styles-menu{display:flex;flex-direction:column;gap:10px}
+  .style-tab{display:flex;align-items:center;gap:14px;text-align:left;width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--line-dim);background:rgba(255,255,255,.015);color:#C4BCAD;cursor:pointer;transition:border-color .3s,background .3s,transform .3s var(--ease);font-family:var(--sans)}
+  .style-tab:hover{border-color:var(--line);transform:translateX(3px)}
+  .style-tab.is-active{border-color:var(--gold);background:linear-gradient(180deg,rgba(201,168,118,.1),rgba(201,168,118,.02))}
+  .style-tab .sw{width:36px;height:36px;border-radius:9px;flex:none;border:1px solid rgba(255,255,255,.14);position:relative;overflow:hidden}
+  .style-tab .sw::after{content:"";position:absolute;right:5px;bottom:5px;width:12px;height:12px;border-radius:3px}
+  .style-tab .tt{display:block;font-size:15px;font-weight:500;color:#EDE7DC}
+  .style-tab .td{display:block;font-size:12px;color:#8a8474;margin-top:1px}
+  .style-tab.is-active .tt{color:#fff}
+  .sw-editorial{background:#F6F2EA}.sw-editorial::after{background:#9a7b3f}
+  .sw-midnight{background:#0a0a0f}.sw-midnight::after{background:#D7FF3E}
+  .sw-minimal{background:#fff}.sw-minimal::after{background:#2b6fff}
+  .sw-brutalist{background:#F2F0E9}.sw-brutalist::after{background:#FF4D2E}
+  .sw-organic{background:#F3EDE4}.sw-organic::after{background:#B6794B}
+  .styles-cta{margin-top:8px;justify-content:center}
+
+  .styles-stage{position:relative}
+  .pv{
+    background:var(--pv-bg);color:var(--pv-fg);border:var(--pv-border,1px solid var(--pv-line));
+    border-radius:var(--pv-radius);padding:clamp(20px,2.6vw,32px);overflow:hidden;
+    min-height:440px;display:flex;flex-direction:column;gap:20px;font-family:var(--pv-body);
+    box-shadow:0 50px 120px -55px rgba(0,0,0,.7);
+    transition:background .5s var(--ease),color .5s var(--ease),border-radius .5s var(--ease),border-color .5s var(--ease);
+  }
+  .pv *{transition:all .45s var(--ease)}
+  .pv-bar{display:flex;align-items:center;justify-content:space-between}
+  .pv-logo{font-family:var(--pv-display);font-weight:var(--pv-dw,700);font-size:15px;letter-spacing:var(--pv-track);font-style:var(--pv-italic,normal)}
+  .pv-nav{display:flex;gap:6px}
+  .pv-nav i{width:18px;height:6px;border-radius:3px;background:var(--pv-muted);opacity:.5}
+  .pv-cta{font-size:11px;padding:7px 13px;border-radius:calc(var(--pv-radius) * .55);background:var(--pv-accent);color:var(--pv-accent-fg);font-weight:600;border:var(--pv-btn-border,none)}
+  .pv-eyebrow{font-family:var(--pv-mono,var(--pv-body));font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pv-accent);font-weight:600}
+  .pv-h{font-family:var(--pv-display);font-weight:var(--pv-dw,700);font-size:clamp(28px,4.6vw,48px);line-height:1.02;letter-spacing:var(--pv-track);font-style:var(--pv-italic,normal);text-transform:var(--pv-htt,none);margin-top:10px}
+  .pv-sub{font-size:14px;color:var(--pv-muted);max-width:38ch;margin-top:12px;line-height:1.5}
+  .pv-btns{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .pv-b1{font-size:13px;padding:11px 20px;border-radius:calc(var(--pv-radius) * .7);background:var(--pv-accent);color:var(--pv-accent-fg);font-weight:600;box-shadow:var(--pv-btn-shadow,none);border:var(--pv-btn-border,none)}
+  .pv-b2{font-size:13px;padding:11px 20px;border-radius:calc(var(--pv-radius) * .7);border:1px solid var(--pv-line2,currentColor);color:var(--pv-fg);opacity:.9}
+  .pv-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:auto}
+  .pv-card{background:var(--pv-card);border:var(--pv-card-border,1px solid var(--pv-line));border-radius:calc(var(--pv-radius) * .8);padding:12px;box-shadow:var(--pv-card-shadow,none)}
+  .pv-thumb{height:44px;border-radius:calc(var(--pv-radius) * .55);background:linear-gradient(135deg,var(--pv-accent),transparent);opacity:.85;margin-bottom:9px}
+  .pv-card span{font-size:11px;color:var(--pv-muted)}
+  .pv-caption{margin-top:22px;font-family:var(--mono);font-size:13px;color:#9b9486;letter-spacing:.02em;line-height:1.55}
+  .pv-caption b{color:var(--gold);font-weight:500}
+
+  .pv[data-style="editorial"]{--pv-bg:#F6F2EA;--pv-fg:#1b1814;--pv-muted:#6a6357;--pv-accent:#9a7b3f;--pv-accent-fg:#fff;--pv-card:#fff;--pv-line:rgba(0,0,0,.1);--pv-line2:rgba(0,0,0,.18);--pv-radius:6px;--pv-display:'DM Serif Display',Georgia,serif;--pv-body:'Space Grotesk',sans-serif;--pv-dw:400;--pv-track:-.01em;--pv-italic:italic;--pv-card-shadow:0 14px 30px -16px rgba(0,0,0,.22)}
+  .pv[data-style="midnight"]{--pv-bg:#0a0a0f;--pv-fg:#ffffff;--pv-muted:#9a9aae;--pv-accent:#D7FF3E;--pv-accent-fg:#0a0a0f;--pv-card:#14141d;--pv-line:rgba(255,255,255,.1);--pv-line2:rgba(255,255,255,.22);--pv-radius:16px;--pv-display:'Archivo',sans-serif;--pv-body:'Space Grotesk',sans-serif;--pv-mono:'Geist Mono',monospace;--pv-dw:900;--pv-track:-.03em}
+  .pv[data-style="minimal"]{--pv-bg:#ffffff;--pv-fg:#111111;--pv-muted:#8a8a8a;--pv-accent:#2b6fff;--pv-accent-fg:#fff;--pv-card:#fafafa;--pv-line:#ececec;--pv-line2:#dcdcdc;--pv-radius:14px;--pv-display:'Space Grotesk',sans-serif;--pv-body:'Space Grotesk',sans-serif;--pv-dw:500;--pv-track:-.02em}
+  .pv[data-style="brutalist"]{--pv-bg:#F2F0E9;--pv-fg:#111111;--pv-muted:#555;--pv-accent:#FF4D2E;--pv-accent-fg:#fff;--pv-card:#fff;--pv-line:#111;--pv-line2:#111;--pv-radius:2px;--pv-display:'Archivo',sans-serif;--pv-body:'Geist Mono',monospace;--pv-dw:800;--pv-track:-.01em;--pv-htt:uppercase;--pv-border:2px solid #111;--pv-card-border:2px solid #111;--pv-btn-border:2px solid #111;--pv-btn-shadow:4px 4px 0 #111;--pv-card-shadow:4px 4px 0 #111}
+  .pv[data-style="organic"]{--pv-bg:#F3EDE4;--pv-fg:#3a3229;--pv-muted:#857b6d;--pv-accent:#B6794B;--pv-accent-fg:#fff;--pv-card:#fff;--pv-line:rgba(0,0,0,.08);--pv-line2:rgba(0,0,0,.14);--pv-radius:26px;--pv-display:'Fraunces',serif;--pv-body:'Space Grotesk',sans-serif;--pv-dw:400;--pv-track:-.01em;--pv-card-shadow:0 18px 40px -20px rgba(120,80,40,.28)}
+
   /* ---------- instagram growth ---------- */
   .ig-wrap{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:clamp(30px,5vw,64px);align-items:center;margin-top:56px}
   @media(max-width:820px){.ig-wrap{grid-template-columns:1fr;gap:42px}}
@@ -324,8 +376,8 @@
 <nav id="nav">
   <a class="brand" href="#top"><span class="mono-badge">PK</span> PK Studio</a>
   <div class="nav-links">
-    <a href="#work">Work</a>
     <a href="#services">Services</a>
+    <a href="#styles">Styles</a>
     <a href="#process">Process</a>
     <a href="#pricing">Pricing</a>
     <a href="#start" class="nav-cta">Start a project</a>
@@ -428,6 +480,61 @@
       <p>Logo, type, color, and a system that makes everything you ship look unmistakably yours.</p>
       <ul><li>Visual identity system</li><li>Social &amp; pitch assets</li><li>Reusable design tokens</li></ul>
     </article>
+  </div>
+</section>
+
+<!-- style picker -->
+<section class="pad wrap" id="styles">
+  <div class="kicker fx">Your brand, your vibe</div>
+  <h2 class="section-title fx d1">Five looks. One that's <em>unmistakably you.</em></h2>
+  <p class="fx d2" style="max-width:56ch;margin-top:20px;color:#A9A294;font-size:clamp(16px,1.4vw,19px)">Tap a direction and watch a live sample restyle in real time. Whatever you pick, I build it custom around your brand — these are starting points, not templates.</p>
+  <div class="styles-wrap fx d2">
+    <div class="styles-menu" role="tablist" aria-label="Design styles">
+      <button class="style-tab is-active" role="tab" aria-selected="true" data-target="editorial">
+        <span class="sw sw-editorial"></span>
+        <span><span class="tt">Editorial Luxe</span><span class="td">Timeless · serif · high-trust</span></span>
+      </button>
+      <button class="style-tab" role="tab" aria-selected="false" data-target="midnight">
+        <span class="sw sw-midnight"></span>
+        <span><span class="tt">Midnight Bold</span><span class="td">Dark · confident · modern</span></span>
+      </button>
+      <button class="style-tab" role="tab" aria-selected="false" data-target="minimal">
+        <span class="sw sw-minimal"></span>
+        <span><span class="tt">Clean Minimal</span><span class="td">Crisp · fast · effortless</span></span>
+      </button>
+      <button class="style-tab" role="tab" aria-selected="false" data-target="brutalist">
+        <span class="sw sw-brutalist"></span>
+        <span><span class="tt">Brutalist Pop</span><span class="td">Loud · raw · scroll-stopping</span></span>
+      </button>
+      <button class="style-tab" role="tab" aria-selected="false" data-target="organic">
+        <span class="sw sw-organic"></span>
+        <span><span class="tt">Warm Organic</span><span class="td">Soft · human · welcoming</span></span>
+      </button>
+      <a href="#start" class="btn btn-gold styles-cta" id="styleCta">Build mine in this style
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="styles-stage">
+      <div class="pv" id="pv" data-style="editorial">
+        <div class="pv-bar">
+          <span class="pv-logo">&#9670; Atelier</span>
+          <span class="pv-nav"><i></i><i></i><i></i></span>
+          <span class="pv-cta">Get started</span>
+        </div>
+        <div>
+          <span class="pv-eyebrow">New collection</span>
+          <h3 class="pv-h">Make it<br>unforgettable.</h3>
+          <p class="pv-sub">Beautiful by default, built to convert from the very first scroll.</p>
+          <div class="pv-btns"><span class="pv-b1">Shop now</span><span class="pv-b2">Learn more</span></div>
+        </div>
+        <div class="pv-cards">
+          <div class="pv-card"><div class="pv-thumb"></div><span>Feature</span></div>
+          <div class="pv-card"><div class="pv-thumb"></div><span>Feature</span></div>
+          <div class="pv-card"><div class="pv-thumb"></div><span>Feature</span></div>
+        </div>
+      </div>
+      <div class="pv-caption" id="pvCaption"></div>
+    </div>
   </div>
 </section>
 
@@ -731,6 +838,48 @@
       es.forEach(function(e){ if(e.isIntersecting){ start(); obs.disconnect(); } });
     }, {threshold:.4});
     obs.observe(card);
+  })();
+
+  // style picker
+  (function(){
+    var pv = document.getElementById('pv');
+    var caption = document.getElementById('pvCaption');
+    var cta = document.getElementById('styleCta');
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.style-tab'));
+    if(!pv || !tabs.length) return;
+    var META = {
+      editorial:{name:'Editorial Luxe', best:'Luxury, beauty, hospitality &amp; personal brands', note:'Serif elegance and generous space — timeless, and instantly high-trust.'},
+      midnight:{name:'Midnight Bold', best:'Tech, startups, fintech &amp; bold consumer apps', note:'Dark and high-contrast — reads modern, premium and sure of itself.'},
+      minimal:{name:'Clean Minimal', best:'SaaS, portfolios &amp; professional services', note:'Crisp and effortless — fast to read, lets your product do the talking.'},
+      brutalist:{name:'Brutalist Pop', best:'Creative studios, fashion &amp; culture brands', note:'Raw, loud and unforgettable — built to stop the scroll cold.'},
+      organic:{name:'Warm Organic', best:'Wellness, food, lifestyle &amp; coaching', note:'Soft, rounded and human — feels welcoming the moment it loads.'}
+    };
+    var current = 'editorial';
+    function paint(key){
+      var m = META[key]; if(!m) return;
+      current = key;
+      pv.setAttribute('data-style', key);
+      caption.innerHTML = '<b>Best for:</b> ' + m.best + '. ' + m.note;
+      if(cta) cta.firstChild.nodeValue = 'Build mine in ' + m.name + ' ';
+      tabs.forEach(function(t){
+        var on = t.getAttribute('data-target') === key;
+        t.classList.toggle('is-active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    }
+    tabs.forEach(function(t){
+      t.addEventListener('click', function(){ paint(t.getAttribute('data-target')); });
+    });
+    // CTA pre-fills the lead form with the chosen style
+    if(cta){
+      cta.addEventListener('click', function(){
+        var msg = document.getElementById('msg');
+        if(msg && !msg.value.trim()){
+          msg.value = 'I love the ' + (META[current] ? META[current].name : current) + ' direction for my project.';
+        }
+      });
+    }
+    paint('editorial');
   })();
 
   // year
