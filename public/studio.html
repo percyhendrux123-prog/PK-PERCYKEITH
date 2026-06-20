@@ -54,6 +54,9 @@
   img{max-width:100%;display:block}
   :focus-visible{outline:2px solid var(--gold-hi);outline-offset:3px;border-radius:4px}
   a:focus-visible,button:focus-visible,.style-tab:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold-hi);outline-offset:3px}
+  .skip-link{position:fixed;top:10px;left:10px;z-index:80;background:var(--gold);color:var(--ink);padding:11px 18px;border-radius:10px;font-family:var(--sans);font-weight:600;font-size:14px;transform:translateY(-160%);transition:transform .2s var(--ease)}
+  .skip-link:focus{transform:none;outline:2px solid var(--ink);outline-offset:2px}
+  #top:focus,#top:focus-visible{outline:none}
   .wrap{width:min(1180px,92vw);margin-inline:auto}
 
   /* film grain + glow overlay */
@@ -394,6 +397,7 @@
 </head>
 <body>
 
+<a class="skip-link" href="#top">Skip to content</a>
 <div class="scroll-prog" id="scrollProg" aria-hidden="true"></div>
 
 <nav id="nav">
@@ -407,7 +411,7 @@
   </div>
 </nav>
 
-<header class="hero wrap" id="top">
+<header class="hero wrap" id="top" tabindex="-1">
   <div>
     <span class="eyebrow"><span class="dot"></span> Now booking new projects</span>
     <h1 class="display">
