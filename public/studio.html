@@ -58,6 +58,19 @@
   .skip-link:focus{transform:none;outline:2px solid var(--ink);outline-offset:2px}
   #top:focus,#top:focus-visible{outline:none}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ---------- custom cursor ---------- */
+  .cursor-dot,.cursor-ring{position:fixed;top:0;left:0;z-index:95;pointer-events:none;border-radius:50%;will-change:transform;opacity:0;transition:opacity .35s}
+  .has-cursor .cursor-dot,.has-cursor .cursor-ring{opacity:1}
+  .cursor-dot{width:6px;height:6px;background:var(--gold)}
+  .cursor-ring{width:40px;height:40px;border:1px solid rgba(201,168,118,.7);display:grid;place-items:center;transition:width .35s var(--ease),height .35s var(--ease),background .35s,border-color .35s,opacity .35s}
+  .cursor-ring.active{width:90px;height:90px;background:rgba(201,168,118,.13);border-color:rgba(201,168,118,.25)}
+  .cursor-ring.hide{opacity:0}
+  .cursor-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-hi);opacity:0;transform:scale(.5);transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  .cursor-ring.active .cursor-label{opacity:1;transform:scale(1)}
+  .has-cursor,.has-cursor a,.has-cursor button,.has-cursor .style-tab,.has-cursor .card,.has-cursor #rail{cursor:none}
+  .has-cursor input,.has-cursor textarea{cursor:text}
+  .has-cursor select{cursor:pointer}
   .wrap{width:min(1180px,92vw);margin-inline:auto}
 
   /* film grain + glow overlay */
@@ -81,8 +94,10 @@
   }
   nav.scrolled{background:rgba(10,10,11,.72);backdrop-filter:blur(14px) saturate(140%);border-bottom:1px solid var(--line-dim)}
   .scroll-prog{position:fixed;top:0;left:0;height:2px;width:100%;transform:scaleX(0);transform-origin:0 50%;background:linear-gradient(90deg,var(--gold),var(--gold-hi));z-index:70;pointer-events:none;will-change:transform}
+  .nav-links a:not(.nav-cta){position:relative}
+  .nav-links a:not(.nav-cta)::after{content:"";position:absolute;left:0;right:0;bottom:-5px;height:1px;background:var(--gold);transform:scaleX(0);transform-origin:0 50%;transition:transform .35s var(--ease)}
+  .nav-links a:not(.nav-cta):hover::after,.nav-links a.active:not(.nav-cta)::after{transform:scaleX(1)}
   .nav-links a.active:not(.nav-cta){color:var(--gold-hi)}
-  .nav-links a.active:not(.nav-cta)::after{content:"";display:block;height:1px;background:var(--gold);margin-top:3px;transform-origin:0 50%;animation:navU .3s var(--ease)}
   @keyframes navU{from{transform:scaleX(0)}to{transform:scaleX(1)}}
   .brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-weight:600;font-size:20px}
   .brand-word{letter-spacing:.16em;font-weight:600}
@@ -451,6 +466,8 @@
 
 <a class="skip-link" href="#top">Skip to content</a>
 <div class="scroll-prog" id="scrollProg" aria-hidden="true"></div>
+<span class="cursor-dot" id="cursorDot" aria-hidden="true"></span>
+<span class="cursor-ring" id="cursorRing" aria-hidden="true"><span class="cursor-label" id="cursorLabel"></span></span>
 
 <nav id="nav">
   <a class="brand" href="#top" aria-label="PKVISION home"><span class="mono-badge">PK</span><span class="brand-word">VISION</span></a>
@@ -938,6 +955,37 @@
       btn.addEventListener('pointerleave', function(){ btn.style.transform = ''; });
     });
   }
+
+  // custom cursor — smooth-follow ring + contextual labels (fine pointer only)
+  (function(){
+    if(rm || !window.matchMedia('(pointer:fine)').matches) return;
+    var dot = document.getElementById('cursorDot'), ring = document.getElementById('cursorRing'), label = document.getElementById('cursorLabel');
+    if(!dot || !ring) return;
+    document.documentElement.classList.add('has-cursor');
+    var mx = window.innerWidth/2, my = window.innerHeight/2, rx = mx, ry = my;
+    (function loop(){
+      rx += (mx - rx) * 0.2; ry += (my - ry) * 0.2;
+      ring.style.transform = 'translate(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px) translate(-50%,-50%)';
+      dot.style.transform = 'translate(' + mx.toFixed(2) + 'px,' + my.toFixed(2) + 'px) translate(-50%,-50%)';
+      requestAnimationFrame(loop);
+    })();
+    // contextual labels for delight
+    var rail = document.getElementById('rail'); if(rail) rail.setAttribute('data-cursor','Drag');
+    document.querySelectorAll('.card-link').forEach(function(a){ a.setAttribute('data-cursor','Open'); });
+    var follow = document.querySelector('.ig-follow'); if(follow) follow.setAttribute('data-cursor','Follow');
+    var send = document.querySelector('#leadForm button'); if(send) send.setAttribute('data-cursor','Send');
+    document.querySelectorAll('.style-tab').forEach(function(t){ t.setAttribute('data-cursor','Preview'); });
+    // hover detection is computed per-move from the true topmost target (deterministic)
+    var SEL = 'a,button,.style-tab,.card,#rail,input,textarea,select,[data-cursor]';
+    window.addEventListener('pointermove', function(e){
+      mx = e.clientX; my = e.clientY;
+      var t = e.target.closest ? e.target.closest(SEL) : null;
+      if(t){ ring.classList.add('active'); var l = t.getAttribute('data-cursor') || ''; if(label.textContent !== l) label.textContent = l; }
+      else if(ring.classList.contains('active')){ ring.classList.remove('active'); label.textContent = ''; }
+    }, { passive: true });
+    document.addEventListener('mouseleave', function(){ ring.classList.add('hide'); dot.style.opacity = '0'; });
+    document.addEventListener('mouseenter', function(){ ring.classList.remove('hide'); dot.style.opacity = ''; });
+  })();
 
   // scroll reveals
   var io = new IntersectionObserver(function(entries){
