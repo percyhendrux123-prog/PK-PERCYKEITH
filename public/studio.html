@@ -6,17 +6,20 @@
 <meta name="theme-color" content="#0A0A0B" />
 
 <title>PK Studio — Websites & apps, built to convert</title>
-<meta name="description" content="Percy King designs and builds fast, beautiful websites and apps that turn visitors into customers. Now booking new projects." />
+<meta name="description" content="Percy Keith designs and builds fast, beautiful websites and apps that turn visitors into customers. Now booking new projects." />
 
 <meta property="og:type" content="website" />
 <meta property="og:title" content="PK Studio — Websites & apps, built to convert" />
 <meta property="og:description" content="Fast, beautiful websites and apps that turn visitors into customers. Now booking new projects." />
 <meta property="og:site_name" content="PK Studio" />
-<meta property="og:image" content="/og.svg" />
+<meta property="og:image" content="/studio-3d.png" />
+<meta property="og:image:width" content="1376" />
+<meta property="og:image:height" content="768" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="PK Studio — Websites & apps, built to convert" />
 <meta name="twitter:description" content="Fast, beautiful websites and apps that turn visitors into customers." />
-<meta name="twitter:image" content="/og.svg" />
+<meta name="twitter:image" content="/studio-3d.png" />
+<meta name="twitter:image:alt" content="A glowing champagne-gold 3D ribbon forming an infinity loop on a black background." />
 
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -74,7 +77,8 @@
   .mono-badge{
     width:34px;height:34px;border-radius:9px;background:var(--ink-2);
     border:1px solid var(--line);display:grid;place-items:center;
-    font-family:var(--serif);font-style:italic;color:var(--gold);font-size:19px;
+    font-family:var(--serif);font-style:italic;color:var(--gold);
+    font-size:15px;font-weight:600;letter-spacing:.02em;
   }
   .nav-links{display:flex;align-items:center;gap:30px;font-size:14px;color:#B9B2A4}
   .nav-links a{transition:color .25s}
@@ -261,6 +265,44 @@
   form .btn-gold{margin-top:6px;justify-content:center;font-size:16px;padding:17px}
   .form-fine{font-size:12px;color:#76705f;text-align:center;margin-top:4px}
 
+  /* ---------- interactive 3D stage ---------- */
+  .stage{position:relative;margin-top:60px;perspective:1200px}
+  .stage-inner{position:relative;border-radius:24px;transform-style:preserve-3d;transition:transform .25s var(--ease);will-change:transform}
+  .stage-glow{position:absolute;inset:-6%;border-radius:30px;background:radial-gradient(circle at var(--mx,50%) var(--my,40%),rgba(201,168,118,.4),transparent 45%);filter:blur(26px);transform:translateZ(-60px);pointer-events:none}
+  .stage-inner img{width:100%;display:block;border-radius:24px;border:1px solid var(--line);box-shadow:0 60px 140px -50px rgba(0,0,0,.85);transform:translateZ(0)}
+  .float{position:absolute;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-hi);background:rgba(10,10,11,.66);backdrop-filter:blur(10px);border:1px solid var(--line);padding:9px 14px;border-radius:100px;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .f1{top:7%;left:5%;transform:translateZ(55px)}
+  .f2{bottom:10%;right:7%;transform:translateZ(95px)}
+  .f3{top:12%;right:9%;transform:translateZ(40px)}
+  .stage-hint{position:absolute;left:50%;bottom:-36px;transform:translateX(-50%);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#6b6557;display:flex;align-items:center;gap:9px;transition:opacity .5s}
+  .stage-hint::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 2.4s infinite}
+  .stage.touched .stage-hint{opacity:0}
+  @media(max-width:600px){.float{font-size:10px;padding:7px 11px}.f3{display:none}}
+
+  /* ---------- instagram growth ---------- */
+  .ig-wrap{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:clamp(30px,5vw,64px);align-items:center;margin-top:56px}
+  @media(max-width:820px){.ig-wrap{grid-template-columns:1fr;gap:42px}}
+  .ig-card{position:relative;border-radius:24px;padding:28px;background:linear-gradient(180deg,#161618,#0d0d0f);border:1px solid var(--line-dim);box-shadow:0 40px 100px -40px rgba(0,0,0,.8);overflow:hidden}
+  .ig-card::before{content:"";position:absolute;inset:0;background:radial-gradient(80% 50% at 50% -10%,rgba(201,168,118,.12),transparent 60%);pointer-events:none}
+  .ig-demo{position:absolute;top:16px;right:16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:#8a8474;border:1px solid var(--line-dim);padding:4px 9px;border-radius:100px}
+  .ig-top{display:flex;align-items:center;gap:16px;position:relative}
+  .ig-avatar{width:74px;height:74px;border-radius:50%;padding:3px;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);flex:none}
+  .ig-avatar span{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:#0d0d0f;font-family:var(--serif);font-style:italic;color:var(--gold);font-size:26px}
+  .ig-name{font-weight:600;font-size:17px;color:#fff}
+  .ig-sub{font-size:13px;color:#9b9486;margin-top:3px}
+  .ig-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:22px 0 4px;text-align:center}
+  .ig-stat b{display:block;font-family:var(--serif);font-weight:500;font-size:24px;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .ig-stat span{font-size:12px;color:#8a8474}
+  .ig-spark{height:64px;margin:18px 0 22px}
+  .ig-spark svg{width:100%;height:100%;display:block}
+  .ig-follow{display:block;text-align:center;background:var(--gold);color:var(--ink);font-weight:600;font-size:14.5px;padding:12px;border-radius:11px;transition:transform .25s var(--ease),box-shadow .3s}
+  .ig-follow:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(201,168,118,.3)}
+  .ig-note{text-align:center;font-family:var(--mono);font-size:10.5px;color:#6b6557;margin-top:14px;letter-spacing:.04em}
+  .ig-copy p{font-size:clamp(17px,1.6vw,21px);font-weight:300;color:#C4BCAD;line-height:1.55}
+  .ig-copy ul{list-style:none;margin-top:24px;display:flex;flex-direction:column;gap:14px}
+  .ig-copy li{display:flex;gap:13px;font-size:15px;color:#C4BCAD}
+  .ig-copy li svg{width:19px;height:19px;color:var(--gold);flex:none;margin-top:2px}
+
   /* ---------- footer ---------- */
   footer{position:relative;z-index:1;border-top:1px solid var(--line-dim);padding:60px 0 50px;margin-top:20px}
   .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;flex-wrap:wrap}
@@ -280,7 +322,7 @@
 <body>
 
 <nav id="nav">
-  <a class="brand" href="#top"><span class="mono-badge">p</span> PK Studio</a>
+  <a class="brand" href="#top"><span class="mono-badge">PK</span> PK Studio</a>
   <div class="nav-links">
     <a href="#work">Work</a>
     <a href="#services">Services</a>
@@ -298,7 +340,7 @@
       <span class="ln"><span><em>engineered</em> to</span></span>
       <span class="ln"><span>win customers.</span></span>
     </h1>
-    <p class="hero-sub">I'm Percy King. I design and build fast, beautiful digital products — the kind people screenshot and competitors copy. Strategy, design, and code from one set of hands.</p>
+    <p class="hero-sub">I'm Percy Keith. I design and build fast, beautiful websites and apps that make a brand impossible to ignore — strategy, design, and code from one set of hands.</p>
     <div class="hero-actions">
       <a href="#start" class="btn btn-gold">Book a free build session
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -320,6 +362,24 @@
     <span>Landing pages</span><span>Web apps</span><span>iOS &amp; Android</span><span>Brand systems</span><span>E-commerce</span><span>Dashboards</span><span>Booking flows</span>
   </div>
 </div>
+
+<!-- interactive 3D showcase -->
+<section class="pad wrap" id="experience">
+  <div class="kicker fx">Made to be felt</div>
+  <h2 class="section-title fx d1">Design that <em>moves</em> with you.</h2>
+  <p class="fx d2" style="max-width:54ch;margin-top:20px;color:#A9A294;font-size:clamp(16px,1.4vw,19px)">Move your cursor across the object below. This kind of living, tactile motion is exactly what I build into the sites and apps I make — the detail that makes a brand feel alive and expensive.</p>
+  <div class="stage fx d2" id="stage">
+    <div class="stage-inner" id="stageInner">
+      <div class="stage-glow"></div>
+      <img src="/studio-3d.webp" width="1376" height="768" loading="lazy" draggable="false"
+           alt="A glowing champagne-gold 3D ribbon twisting into an infinity loop, rendered on a black background" />
+      <span class="float f1">Interactive</span>
+      <span class="float f2">Live motion</span>
+      <span class="float f3">&#8734; possibilities</span>
+    </div>
+    <div class="stage-hint">Move your cursor &middot; or tap</div>
+  </div>
+</section>
 
 <!-- value strip -->
 <section class="light pad" id="why">
@@ -415,7 +475,54 @@
 <section class="pad wrap">
   <div class="quote fx">
     <p>I build the kind of website you'd be <span>proud to put your name on</span> — the one that makes a stranger trust you in the first five seconds.</p>
-    <div class="who">— Percy King, PK Studio</div>
+    <div class="who">— Percy Keith, PK Studio</div>
+  </div>
+</section>
+
+<!-- instagram growth -->
+<section class="pad wrap" id="social">
+  <div class="kicker fx">Audience, not just traffic</div>
+  <h2 class="section-title fx d1">I build brands that <em>grow</em> a following.</h2>
+  <div class="ig-wrap">
+    <div class="ig-card fx d1" id="igCard">
+      <span class="ig-demo">Illustrative demo</span>
+      <div class="ig-top">
+        <div class="ig-avatar"><span>PK</span></div>
+        <div>
+          <div class="ig-name">officialpercyk</div>
+          <div class="ig-sub">PK Studio · Web &amp; app design</div>
+        </div>
+      </div>
+      <div class="ig-stats">
+        <div class="ig-stat"><b id="igPosts">0</b><span>posts</span></div>
+        <div class="ig-stat"><b id="igFollowers">0</b><span>followers</span></div>
+        <div class="ig-stat"><b id="igFollowing">0</b><span>following</span></div>
+      </div>
+      <div class="ig-spark" id="igSpark">
+        <svg viewBox="0 0 320 64" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="igGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#C9A876" stop-opacity=".34"/>
+              <stop offset="1" stop-color="#C9A876" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path id="igArea" fill="url(#igGrad)" opacity="0"
+            d="M0,58 L40,53 L80,50 L120,45 L160,39 L200,31 L240,23 L280,13 L320,5 L320,64 L0,64 Z"/>
+          <path id="igLine" fill="none" stroke="#C9A876" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            d="M0,58 L40,53 L80,50 L120,45 L160,39 L200,31 L240,23 L280,13 L320,5"/>
+        </svg>
+      </div>
+      <a class="ig-follow" href="https://www.instagram.com/officialpercyk" target="_blank" rel="noopener">Follow @officialpercyk</a>
+      <div class="ig-note">Animated growth demo — tap follow for the real profile</div>
+    </div>
+    <div class="ig-copy fx d2">
+      <p>A great website is only half the story. I design the surfaces that <em style="color:var(--gold-hi);font-style:normal">compound</em> — profile, posts, link-in-bio, and landing pages that turn a scroll into a follow, and a follow into a customer.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg> Content surfaces built to convert attention into action</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg> Link-in-bio and landing pages that match your feed</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v6h-6"/></svg> One consistent brand from first scroll to checkout</li>
+      </ul>
+    </div>
   </div>
 </section>
 
@@ -513,7 +620,7 @@
     </div>
   </div>
   <div class="copy">
-    <span>© <span id="yr"></span> PK Studio — Percy King</span>
+    <span>© <span id="yr"></span> PK Studio — Percy Keith</span>
     <span>Websites · Apps · Brand systems</span>
   </div>
 </footer>
@@ -538,28 +645,93 @@
   }, {threshold:.16, rootMargin:'0px 0px -8% 0px'});
   document.querySelectorAll('.fx').forEach(function(el){ rm ? el.classList.add('in') : io.observe(el); });
 
-  // count-up stats
-  var sObs = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if(!e.isIntersecting) return;
-      sObs.unobserve(e.target);
-      e.target.querySelectorAll('[data-count]').forEach(function(node){
-        var target = parseFloat(node.getAttribute('data-count'));
-        var suffix = node.getAttribute('data-suffix') || '';
-        var dec = parseInt(node.getAttribute('data-dec')||'0',10);
-        if(rm){ node.innerHTML = '<i>'+target.toFixed(dec)+suffix+'</i>'; return; }
-        var start = performance.now(), dur = 1400;
-        (function tick(now){
-          var p = Math.min((now-start)/dur,1);
-          var eased = 1-Math.pow(1-p,3);
-          var val = (target*eased).toFixed(dec);
-          node.innerHTML = '<i>'+val+suffix+'</i>';
-          if(p<1) requestAnimationFrame(tick);
-        })(start);
-      });
-    });
-  }, {threshold:.5});
-  var stats = document.getElementById('stats'); if(stats) sObs.observe(stats);
+  // interactive 3D tilt stage
+  (function(){
+    var stage = document.getElementById('stage');
+    var inner = document.getElementById('stageInner');
+    if(!stage || !inner || rm) return;        // respect reduced motion: leave static
+    var MAX_X = 10, MAX_Y = 14;               // max tilt in degrees
+    var tx = 0, ty = 0, cx = 0, cy = 0, raf = null;
+    function loop(){
+      cx += (tx - cx) * 0.12;
+      cy += (ty - cy) * 0.12;
+      inner.style.transform = 'rotateX(' + cy.toFixed(2) + 'deg) rotateY(' + cx.toFixed(2) + 'deg)';
+      if(Math.abs(tx - cx) > 0.03 || Math.abs(ty - cy) > 0.03){ raf = requestAnimationFrame(loop); }
+      else { raf = null; }
+    }
+    function point(px, py){
+      var r = stage.getBoundingClientRect();
+      var nx = (px - r.left) / r.width - 0.5;   // -0.5 .. 0.5
+      var ny = (py - r.top) / r.height - 0.5;
+      tx = nx * MAX_Y;
+      ty = -ny * MAX_X;
+      inner.style.setProperty('--mx', (50 + nx * 70) + '%');
+      inner.style.setProperty('--my', (40 + ny * 70) + '%');
+      stage.classList.add('touched');
+      if(!raf) raf = requestAnimationFrame(loop);
+    }
+    function reset(){
+      tx = 0; ty = 0;
+      inner.style.setProperty('--mx','50%'); inner.style.setProperty('--my','40%');
+      if(!raf) raf = requestAnimationFrame(loop);
+    }
+    stage.addEventListener('pointermove', function(e){ point(e.clientX, e.clientY); });
+    stage.addEventListener('pointerleave', reset);
+  })();
+
+  // instagram growth demo (illustrative)
+  (function(){
+    var card = document.getElementById('igCard');
+    var fol = document.getElementById('igFollowers');
+    if(!card || !fol) return;
+    var posts = document.getElementById('igPosts');
+    var fwg = document.getElementById('igFollowing');
+    var line = document.getElementById('igLine');
+    var area = document.getElementById('igArea');
+    function fmt(n){ return n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,'') + 'k' : String(n); }
+    function countTo(el, target, dur, formatter){
+      if(rm){ el.textContent = formatter ? formatter(target) : target; return; }
+      var start = performance.now();
+      (function tick(now){
+        var p = Math.min((now - start)/dur, 1);
+        var e = 1 - Math.pow(1 - p, 3);
+        var v = Math.round(target * e);
+        el.textContent = formatter ? formatter(v) : v;
+        if(p < 1) requestAnimationFrame(tick);
+      })(start);
+    }
+    var started = false, current = 0;
+    function start(){
+      if(started) return; started = true;
+      var base = 12400;
+      countTo(posts, 87, 1000);
+      countTo(fwg, 312, 1100);
+      countTo(fol, base, 1600, fmt);
+      current = base;
+      if(line && !rm){
+        var len = line.getTotalLength();
+        line.style.strokeDasharray = len;
+        line.style.strokeDashoffset = len;
+        line.getBoundingClientRect();            // force reflow so the transition runs
+        line.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(.22,1,.36,1)';
+        line.style.strokeDashoffset = '0';
+      }
+      if(area && !rm){ area.style.transition = 'opacity 1.2s ease .5s'; area.style.opacity = '1'; }
+      else if(area){ area.style.opacity = '1'; }
+      if(!rm){
+        setTimeout(function(){
+          setInterval(function(){
+            current += Math.floor(Math.random()*7) + 1;
+            fol.textContent = fmt(current);
+          }, 2600);
+        }, 1800);
+      }
+    }
+    var obs = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ start(); obs.disconnect(); } });
+    }, {threshold:.4});
+    obs.observe(card);
+  })();
 
   // year
   document.getElementById('yr').textContent = new Date().getFullYear();
@@ -572,7 +744,9 @@
     var email = (f.email.value||'').trim();
     var type = f.type.value;
     var msg = (f.msg.value||'').trim();
-    if(!name || !email){ (name?f.email:f.name).focus(); return; }
+    var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if(!name){ f.name.focus(); return; }
+    if(!emailOk){ f.email.focus(); f.email.select(); return; }
     var subject = 'New project enquiry — ' + name;
     var body =
       'Name: ' + name + '\n' +
