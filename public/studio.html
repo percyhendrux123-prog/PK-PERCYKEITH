@@ -6,18 +6,18 @@
 <meta name="theme-color" content="#0A0A0B" />
 <script>document.documentElement.className = 'js';</script>
 
-<title>PK Studio — Websites & apps, built to convert</title>
+<title>PKVISION — Websites & apps, built to convert</title>
 <meta name="description" content="Percy Keith designs and builds fast, beautiful websites and apps that turn visitors into customers. Now booking new projects." />
 
 <meta property="og:type" content="website" />
-<meta property="og:title" content="PK Studio — Websites & apps, built to convert" />
+<meta property="og:title" content="PKVISION — Websites & apps, built to convert" />
 <meta property="og:description" content="Fast, beautiful websites and apps that turn visitors into customers. Now booking new projects." />
-<meta property="og:site_name" content="PK Studio" />
+<meta property="og:site_name" content="PKVISION" />
 <meta property="og:image" content="/studio-3d.png" />
 <meta property="og:image:width" content="1376" />
 <meta property="og:image:height" content="768" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="PK Studio — Websites & apps, built to convert" />
+<meta name="twitter:title" content="PKVISION — Websites & apps, built to convert" />
 <meta name="twitter:description" content="Fast, beautiful websites and apps that turn visitors into customers." />
 <meta name="twitter:image" content="/studio-3d.png" />
 <meta name="twitter:image:alt" content="A glowing champagne-gold 3D ribbon forming an infinity loop on a black background." />
@@ -84,7 +84,8 @@
   .nav-links a.active:not(.nav-cta){color:var(--gold-hi)}
   .nav-links a.active:not(.nav-cta)::after{content:"";display:block;height:1px;background:var(--gold);margin-top:3px;transform-origin:0 50%;animation:navU .3s var(--ease)}
   @keyframes navU{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-  .brand{display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:.01em}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-weight:600;font-size:20px}
+  .brand-word{letter-spacing:.16em;font-weight:600}
   .mono-badge{
     width:34px;height:34px;border-radius:9px;background:var(--ink-2);
     border:1px solid var(--line);display:grid;place-items:center;
@@ -165,9 +166,9 @@
   h2.section-title{font-family:var(--serif);font-weight:300;letter-spacing:-.02em;line-height:1.02;font-size:clamp(32px,5.4vw,68px)}
   h2.section-title em{font-style:italic;color:var(--gold);margin-right:.04em}
 
-  .js .fx{opacity:0;transform:translateY(34px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+  .js .fx{opacity:0;transform:translateY(54px) scale(.984);transition:opacity .8s var(--ease),transform .95s cubic-bezier(.16,1,.3,1)}
   .fx.in{opacity:1;transform:none}
-  .fx.d1{transition-delay:.08s}.fx.d2{transition-delay:.16s}.fx.d3{transition-delay:.24s}.fx.d4{transition-delay:.32s}
+  .fx.d1{transition-delay:.07s}.fx.d2{transition-delay:.14s}.fx.d3{transition-delay:.21s}.fx.d4{transition-delay:.28s}
 
   /* ---------- value strip (light, Apple-like) ---------- */
   .light{background:var(--paper);color:var(--ink)}
@@ -422,7 +423,7 @@
 <div class="scroll-prog" id="scrollProg" aria-hidden="true"></div>
 
 <nav id="nav">
-  <a class="brand" href="#top"><span class="mono-badge">PK</span> PK Studio</a>
+  <a class="brand" href="#top" aria-label="PKVISION home"><span class="mono-badge">PK</span><span class="brand-word">VISION</span></a>
   <div class="nav-links">
     <a href="#services">Services</a>
     <a href="#styles">Styles</a>
@@ -648,7 +649,7 @@
 <section class="pad wrap">
   <div class="quote fx">
     <p>I build the kind of website you'd be <span>proud to put your name on</span> — the one that makes a stranger trust you in the first five seconds.</p>
-    <div class="who">— Percy Keith, PK Studio</div>
+    <div class="who">— Percy Keith, PKVISION</div>
   </div>
 </section>
 
@@ -787,7 +788,7 @@
     </div>
   </div>
   <div class="copy">
-    <span>© <span id="yr"></span> PK Studio — Percy Keith</span>
+    <span>© <span id="yr"></span> PKVISION — Percy Keith</span>
     <span>Websites · Apps · Brand systems</span>
   </div>
 </footer>
@@ -799,18 +800,25 @@
   // hero line reveal
   requestAnimationFrame(function(){ document.querySelector('.hero').classList.add('reveal-in'); });
 
-  // nav scrolled state + scroll-progress bar
+  // nav scrolled state + scroll-progress bar + hero parallax
   var nav = document.getElementById('nav');
   var prog = document.getElementById('scrollProg');
-  var onScroll = function(){
-    nav.classList.toggle('scrolled', window.scrollY > 30);
+  var heroC = document.querySelector('.hero > div');
+  var ticking = false;
+  var render = function(){
+    ticking = false;
+    var y = window.scrollY;
+    nav.classList.toggle('scrolled', y > 30);
     if(prog){
-      var h = document.documentElement;
-      var max = h.scrollHeight - h.clientHeight;
-      prog.style.transform = 'scaleX(' + (max > 0 ? Math.min(window.scrollY / max, 1) : 0) + ')';
+      var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+      prog.style.transform = 'scaleX(' + (max > 0 ? Math.min(y / max, 1) : 0) + ')';
+    }
+    if(heroC && !rm){            // kinetic hero: drifts up + fades as you scroll past
+      if(y < 820){ heroC.style.transform = 'translateY(' + (y * 0.16).toFixed(1) + 'px)'; heroC.style.opacity = String(Math.max(0, 1 - y / 620)); }
     }
   };
-  onScroll(); window.addEventListener('scroll', onScroll, {passive:true});
+  var onScroll = function(){ if(!ticking){ ticking = true; requestAnimationFrame(render); } };
+  render(); window.addEventListener('scroll', onScroll, {passive:true});
 
   // scroll-spy: highlight the nav link for the section in view
   (function(){
