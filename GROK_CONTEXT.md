@@ -35,8 +35,9 @@ motion curves, and the entire NEVER list in `pkfit-design`.
 
 ## Rules for a bot working here
 
-1. Load the `pkfit-voice` and `pkfit-design` skills first. The voice contract and the
-   ethical floor apply to every string rendered on this page.
+1. Read `/workspace/pkfit/VOICE.md` and `/workspace/pkfit/DESIGN.md` on the agent
+   computer first. The voice contract and the ethical floor apply to every string
+   rendered on this page.
 2. No emoji, no exclamation points, no hype vocabulary — including in coach notes, PR
    captions, and empty states.
 3. **Client data is real.** Never invent a client name, a lift number, a PR, or a week
